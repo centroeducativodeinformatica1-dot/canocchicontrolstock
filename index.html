@@ -83,7 +83,6 @@ img.icon {
   height: 20px;
 }
 
-/* Excel button */
 #excelBtn {
   margin: 10px 0;
   background: none;
@@ -132,15 +131,15 @@ img.icon {
 <div id="noti"></div>
 
 <script>
-// LOGIN
+// LOGIN (MEJORADO)
 function login() {
-  const u = document.getElementById("user").value;
-  const p = document.getElementById("pass").value;
+  const u = document.getElementById("user").value.trim().toLowerCase();
+  const p = document.getElementById("pass").value.trim();
 
   document.getElementById("loading").style.display = "block";
 
   setTimeout(() => {
-    if (u === "Cannochi" && p === "Guemes1194") {
+    if (u === "cannochi" && p === "Guemes1194") {
       document.getElementById("login").style.display = "none";
       document.getElementById("app").style.display = "block";
       render();
@@ -151,7 +150,7 @@ function login() {
   }, 800);
 }
 
-// DATA (queda guardado SIEMPRE)
+// DATA
 let data = JSON.parse(localStorage.getItem("stock")) || {
   "Golosinas": []
 };
@@ -242,7 +241,7 @@ document.getElementById("buscador").addEventListener("input", e=>{
   });
 });
 
-// NOTIFICACION
+// NOTI
 function noti(msg){
   const n = document.getElementById("noti");
   n.innerText = msg;
@@ -250,7 +249,7 @@ function noti(msg){
   setTimeout(()=> n.style.display="none",2000);
 }
 
-// EXPORTAR A EXCEL (CSV)
+// EXPORTAR
 function exportarExcel() {
   let filas = [["Sección","Nombre","Marca","Cantidad","Código"]];
 
