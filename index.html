@@ -57,6 +57,12 @@ button {
   padding: 20px;
 }
 
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 h1 {
   color: #d60000;
 }
@@ -115,7 +121,10 @@ img.icon {
 
 <!-- APP -->
 <div id="app">
-  <h1>Control de Stock</h1>
+  <div class="topbar">
+    <h1>Control de Stock</h1>
+    <button onclick="logout()">Cerrar sesión</button>
+  </div>
 
   <input id="buscador" placeholder="Buscar por nombre, marca o código...">
 
@@ -131,23 +140,38 @@ img.icon {
 <div id="noti"></div>
 
 <script>
-// LOGIN (MEJORADO)
+// AUTO LOGIN
+if(localStorage.getItem("login") === "ok"){
+  mostrarApp();
+}
+
+// LOGIN
 function login() {
-  const u = document.getElementById("user").value.trim().toLowerCase();
+  const u = document.getElementById("user").value.trim();
   const p = document.getElementById("pass").value.trim();
 
   document.getElementById("loading").style.display = "block";
 
   setTimeout(() => {
-    if (u === "cannochi" && p === "Guemes1194") {
-      document.getElementById("login").style.display = "none";
-      document.getElementById("app").style.display = "block";
-      render();
+    if (u === "Canocchi" && p === "Guemes1194") {
+      localStorage.setItem("login","ok");
+      mostrarApp();
     } else {
-      alert("Datos incorrectos");
+      alert("Usuario o contraseña incorrectos");
     }
     document.getElementById("loading").style.display = "none";
-  }, 800);
+  }, 700);
+}
+
+function mostrarApp(){
+  document.getElementById("login").style.display = "none";
+  document.getElementById("app").style.display = "block";
+  render();
+}
+
+function logout(){
+  localStorage.removeItem("login");
+  location.reload();
 }
 
 // DATA
