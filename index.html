@@ -2,12 +2,82 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Canocchi</title>
+<title>Canocchi Stock</title>
 
 <style>
-body { font-family: Arial; }
+body { font-family: Arial; margin:0; background:#f5f5f5; }
 
-#app { display:none; }
+/* LOGIN */
+#login {
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+}
+#login img { width:180px; margin-bottom:20px; }
+
+input, select {
+  padding:10px;
+  margin:5px;
+  width:220px;
+  border-radius:6px;
+  border:1px solid #ccc;
+}
+
+button {
+  padding:10px;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+.btn-rojo { background:#d60000; color:white; }
+
+#error { color:red; }
+
+/* APP */
+#app { display:none; padding:20px; }
+
+h1 { color:#d60000; }
+
+.seccion {
+  background:white;
+  padding:15px;
+  border-radius:10px;
+  margin-bottom:15px;
+}
+
+.producto {
+  display:flex;
+  justify-content:space-between;
+  padding:6px;
+  border-bottom:1px solid #eee;
+}
+
+.stock-bajo { color:orange; }
+.stock-critico { color:red; font-weight:bold; }
+
+img.icon { width:20px; }
+
+/* FORM */
+#formProducto {
+  background:white;
+  padding:15px;
+  border-radius:10px;
+  margin-bottom:15px;
+}
+
+#noti {
+  position:fixed;
+  top:20px;
+  right:20px;
+  background:#d60000;
+  color:white;
+  padding:10px;
+  border-radius:8px;
+  display:none;
+}
 </style>
 </head>
 
@@ -15,33 +85,211 @@ body { font-family: Arial; }
 
 <!-- LOGIN -->
 <div id="login">
-  <h2>Login</h2>
-  <input id="user" placeholder="Usuario"><br><br>
-  <input id="pass" type="password" placeholder="Contraseña"><br><br>
-  <button onclick="login()">Entrar</button>
-  <p id="msg"></p>
+  <img src="CanocchiLogo.PNG">
+  <input id="user" placeholder="Usuario">
+  <input id="pass" type="password" placeholder="Contraseña">
+  <button id="btnLogin" class="btn-rojo">Iniciar sesión</button>
+  <div id="error"></div>
 </div>
 
 <!-- APP -->
 <div id="app">
-  <h1>BIENVENIDO AL SISTEMA ✔</h1>
+  <h1>Control de Stock</h1>
+
+  <input id="buscador" placeholder="Buscar por nombre, marca o código...">
+
+  <!-- Excel -->
+  <button id="excelBtn">
+    <img src="logoexcel.png" style="width:26px;">
+  </button>
+
+  <!-- FORM ESCANER -->
+  <div id="formProducto">
+    <h3>Agregar / Escanear producto</h3>
+
+    <select id="f_seccion"></select>
+    <input id="f_nombre" placeholder="Nombre">
+    <input id="f_marca" placeholder="Marca">
+    <input id="f_cantidad" type="number" placeholder="Cantidad">
+    <input id="f_codigo" placeholder="Escanear código de barras">
+
+    <button id="guardarBtn" class="btn-rojo">Guardar</button>
+  </div>
+
+  <div id="contenedor"></div>
+
+  <button id="btnSeccion" class="btn-rojo">+ Sección</button>
+  <button onclick="logout()">Cerrar sesión</button>
 </div>
 
+<div id="noti"></div>
+
 <script>
-function login() {
-  var u = document.getElementById("user").value;
-  var p = document.getElementById("pass").value;
+document.addEventListener("DOMContentLoaded", function(){
 
-  if (u === "Canocchi" && p === "Guemes1194") {
+// LOGIN
+const USER="Canocchi";
+const PASS="Guemes1194";
 
-    // 🔥 CLAVE (esto te faltaba)
-    document.getElementById("login").style.display = "none";
-    document.getElementById("app").style.display = "block";
+document.getElementById("btnLogin").addEventListener("click", function(){
+  const u=document.getElementById("user").value.trim();
+  const p=document.getElementById("pass").value.trim();
 
+  if(u===USER && p===PASS){
+    document.getElementById("login").style.display="none";
+    document.getElementById("app").style.display="block";
+    cargarSecciones();
+    render();
   } else {
-    document.getElementById("msg").innerText = "ERROR";
+    document.getElementById("error").innerText="Datos incorrectos";
   }
+});
+
+window.logout=function(){ location.reload(); };
+
+// DATA
+let data=JSON.parse(localStorage.getItem("stock"))||{"Golosinas":[]};
+
+function save(){
+  localStorage.setItem("stock",JSON.stringify(data));
 }
+
+// SECCIONES
+function cargarSecciones(){
+  const sel=document.getElementById("f_seccion");
+  sel.innerHTML="";
+  Object.keys(data).sort().forEach(s=>{
+    let op=document.createElement("option");
+    op.value=s;
+    op.textContent=s;
+    sel.appendChild(op);
+  });
+}
+
+// RENDER
+function render(){
+  const cont=document.getElementById("contenedor");
+  cont.innerHTML="";
+
+  Object.keys(data).sort().forEach(sec=>{
+    let div=document.createElement("div");
+    div.className="seccion";
+    div.innerHTML="<h2>"+sec+"</h2>";
+
+    data[sec].forEach(p=>{
+      let clase="";
+      if(p.cantidad<=2) clase="stock-critico";
+      else if(p.cantidad<=3) clase="stock-bajo";
+
+      let el=document.createElement("div");
+      el.className="producto";
+      el.innerHTML=`
+        <span class="${clase}">
+        ${p.nombre} (${p.marca||""}) - ${p.cantidad}
+        </span>
+        <button onclick="delProd('${sec}','${p.nombre}')">
+          <img src="eliminar.png" class="icon">
+        </button>
+      `;
+      div.appendChild(el);
+    });
+
+    let btn=document.createElement("button");
+    btn.innerHTML=<img src="agregar.png" class="icon">;
+    btn.onclick=()=>document.getElementById("f_codigo").focus();
+
+    div.appendChild(btn);
+    cont.appendChild(div);
+  });
+}
+
+// ESCANER (ENTER AUTO)
+document.getElementById("f_codigo").addEventListener("keypress", function(e){
+  if(e.key==="Enter") guardarProducto();
+});
+
+// GUARDAR
+function guardarProducto(){
+  const sec=f_seccion.value;
+  const nombre=f_nombre.value;
+  const marca=f_marca.value;
+  const cantidad=parseInt(f_cantidad.value);
+  const codigo=f_codigo.value;
+
+  if(!nombre || isNaN(cantidad)){
+    alert("Nombre y cantidad obligatorios");
+    return;
+  }
+
+  let existente=data[sec].find(p=>p.codigo===codigo && codigo);
+
+  if(existente){
+    existente.cantidad+=cantidad;
+    noti("Stock actualizado");
+  } else {
+    data[sec].push({nombre,marca,cantidad,codigo});
+    noti("Producto agregado");
+  }
+
+  save();
+  render();
+
+  f_nombre.value="";
+  f_marca.value="";
+  f_cantidad.value="";
+  f_codigo.value="";
+}
+
+// ELIMINAR
+window.delProd=function(sec,nombre){
+  data[sec]=data[sec].filter(p=>p.nombre!==nombre);
+  save();
+  render();
+};
+
+// SECCION
+document.getElementById("btnSeccion").addEventListener("click", function(){
+  const n=prompt("Nombre sección:");
+  if(!n) return;
+  data[n]=[];
+  save();
+  cargarSecciones();
+  render();
+});
+
+// BUSCADOR
+document.getElementById("buscador").addEventListener("input", e=>{
+  const v=e.target.value.toLowerCase();
+  document.querySelectorAll(".producto").forEach(p=>{
+    p.style.display=p.textContent.toLowerCase().includes(v)?"flex":"none";
+  });
+});
+
+// NOTI
+function noti(msg){
+  const n=document.getElementById("noti");
+  n.innerText=msg;
+  n.style.display="block";
+  setTimeout(()=>n.style.display="none",2000);
+}
+
+// EXCEL
+document.getElementById("excelBtn").addEventListener("click", function(){
+  let filas=[["Sección","Nombre","Marca","Cantidad","Código"]];
+  Object.keys(data).forEach(sec=>{
+    data[sec].forEach(p=>{
+      filas.push([sec,p.nombre,p.marca||"",p.cantidad,p.codigo||""]);
+    });
+  });
+
+  let csv=filas.map(f=>f.join(",")).join("\n");
+  let a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv]));
+  a.download="stock_canocchi.csv";
+  a.click();
+});
+
+});
 </script>
 
 </body>
