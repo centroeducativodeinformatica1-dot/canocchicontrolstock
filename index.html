@@ -271,18 +271,39 @@ window.doLogin = async function () {
 
     const snap = await getDocs(q);
 
-    if (snap.empty) {
-        document.getElementById("login-msg").textContent = "Usuario o contraseña incorrectos.";
+    window.dologin = async function() {
+    const usuario = document.getElementById("user").value.trim();
+    const password = document.getElementById("pass").value.trim();
+    const msg = document.getElementById("login-msg");
+
+    msg.textContent = "";
+
+    if (!usuario || !password) {
+        msg.textContent = "Completa usuario y contraseña";
         return;
     }
 
-    empleadoActual = snap.docs[0].data().nombre;
+    try {
+        const q = query(
+            collection(db, "empleados"),
+            where("usuario", "==", usuario),
+            where("password", "==", password)
+        );
 
-    document.getElementById("empleado-label").textContent = empleadoActual;
-    document.getElementById("login-view").classList.add("hidden");
-    document.getElementById("pos-view").classList.remove("hidden");
+        const snap = await getDocs(q);
 
-    cargarCategorias();
+        if (snap.empty) {
+            msg.textContent = "Usuario o contraseña incorrectos";
+            return;
+        }
+
+        // LOGIN CORRECTO
+        window.location.href = "dashboard.html";
+
+    } catch (err) {
+        console.error(err);
+        msg.textContent = "Error al iniciar sesión";
+    }
 };
     /* ============================
    BUSCAR PRODUCTO
