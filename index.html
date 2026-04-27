@@ -81,11 +81,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// VARIABLES
 let carrito = [];
 let empleado = null;
 
-// ELEMENTOS
 const loginView = document.getElementById("login-view");
 const posView = document.getElementById("pos-view");
 const msg = document.getElementById("login-msg");
@@ -126,7 +124,7 @@ console.error(e);
 // LOGOUT
 document.getElementById("logoutBtn").onclick=()=>location.reload();
 
-// BUSCAR PRODUCTO
+// BUSCAR
 document.getElementById("codigo-input").addEventListener("keydown",e=>{
 if(e.key==="Enter") buscar();
 });
@@ -158,13 +156,13 @@ carritoBody.innerHTML="";
 carrito.forEach((p,i)=>{
 total+=p.precio;
 
-carritoBody.innerHTML+= <tr> <td>${p.nombre}</td> <td>${p.precio}</td> <td><button data-i="${i}" class="delBtn">X</button></td> </tr>;
+carritoBody.innerHTML += <tr> <td>${p.nombre}</td> <td>${p.precio}</td> <td><button data-i="${i}" class="delBtn">X</button></td> </tr>;
 });
 
 totalLabel.textContent=total;
 btnPagar.classList.toggle("hidden", carrito.length===0);
 
-// eliminar dinámico
+// eliminar
 document.querySelectorAll(".delBtn").forEach(btn=>{
 btn.onclick=()=>{
 const i = btn.getAttribute("data-i");
@@ -206,7 +204,6 @@ if(paga<total){alert("Monto insuficiente");return;}
 vuelto=paga-total;
 }
 
-// venta
 const venta={
 fecha:Date.now(),
 empleado,
@@ -218,10 +215,8 @@ items:carrito
 
 await addDoc(collection(db,"ventas"),venta);
 
-// ticket
 imprimirTicket(venta);
 
-// actualizar stock
 for(const p of carrito){
 const q=query(collection(db,"productos"),where("codigo","==",p.codigo));
 const s=await getDocs(q);
@@ -233,32 +228,17 @@ carrito=[];
 render();
 };
 
-// TICKET (100% seguro sin romper JS)
+// TICKET
 function imprimirTicket(v){
 
-const html = `
-<html>
-<body style="font-family:monospace">
-
-<h3>CANOCCHI STORE</h3>
-${new Date(v.fecha).toLocaleString()}
-
-<hr>
-
-${v.items.map(i => ${i.nombre} $${i.precio}).join("<br>")}
-
-<hr>
-
-TOTAL: $${v.total}<br>
-${v.vuelto ? "Vuelto: $" + v.vuelto : ""}
-
-</body>
-</html>
-`;
+const html = <html> <body style="font-family:monospace">  <h3>CANOCCHI STORE</h3> ${new Date(v.fecha).toLocaleString()}  <hr>  ${v.items.map(i =>${i.nombre} $${i.precio}).join("<br>")}  <hr>  TOTAL: $${v.total}<br> ${v.vuelto ? "Vuelto: $" + v.vuelto : ""}  </body> </html> ;
 
 const w = window.open("");
 w.document.write(html);
 w.document.close();
 w.print();
 }
-  
+
+</script>
+</body>
+</html>
