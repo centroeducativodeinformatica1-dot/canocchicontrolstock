@@ -10,21 +10,22 @@
 
 <style>
 body { font-family: Arial; background:#f5f5f5; margin:0; }
-.hidden { display:none; }
-.card { background:#fff; padding:15px; border-radius:8px; max-width:900px; margin:15px auto; }
-input { width:100%; padding:10px; margin:6px 0; border-radius:6px; border:1px solid #ccc; }
-.btn-rojo { background:#E53935;color:#fff;border:none;padding:10px;border-radius:6px;cursor:pointer; }
-.btn-negro { background:#000;color:#fff;border:none;padding:10px;border-radius:6px;cursor:pointer; }
-table { width:100%; border-collapse:collapse; margin-top:10px;}
+.hidden{display:none;}
+.card{background:#fff;padding:15px;border-radius:8px;max-width:900px;margin:15px auto;}
+input{width:100%;padding:10px;margin:6px 0;border-radius:6px;border:1px solid #ccc;}
+.btn-rojo{background:#E53935;color:#fff;border:none;padding:10px;border-radius:6px;cursor:pointer;}
+.btn-negro{background:#000;color:#fff;border:none;padding:10px;border-radius:6px;cursor:pointer;}
+table{width:100%;border-collapse:collapse;}
 td,th{border:1px solid #ccc;padding:6px;}
+#scanner{width:100%;height:250px;background:#000;margin-top:10px;}
 </style>
 </head>
 
 <body>
 
 <!-- LOGIN -->
-<div id="login-view" class="card">
-<h2>Canocchi POS</h2>
+<div id="login-view">
+<img src="CanocchiLogo.PNG" style="width:170px;">
 <input id="user" placeholder="Usuario">
 <input id="pass" type="password" placeholder="Contraseña">
 <button class="btn-rojo" onclick="doLogin()">Ingresar</button>
@@ -35,30 +36,34 @@ td,th{border:1px solid #ccc;padding:6px;}
 <div id="pos-view" class="hidden card">
 
 <div style="display:flex;justify-content:space-between;">
+<h2>Canocchi POS</h2>
 <div>
-<h3>POS</h3>
 <span id="empleado-label"></span>
-</div>
-<div>
 <button class="btn-rojo" onclick="logout()">Salir</button>
 </div>
 </div>
 
 <hr>
 
-<button onclick="abrirCaja()">Abrir Caja</button>
-<button onclick="cerrarCaja()">Cerrar Caja</button>
-<button onclick="dashboard()">Dashboard</button>
+<button class="btn-negro" onclick="toggleScanner()">📷 Escanear</button>
+<button class="btn-negro" onclick="dashboard()">📊 Dashboard</button>
+<button class="btn-negro" onclick="historialHoy()">📄 Hoy</button>
+<button class="btn-negro" onclick="exportarExcel()">📥 Excel</button>
+
+<div id="scanner" class="hidden"></div>
 
 <input id="codigo-input" placeholder="Código" onkeydown="if(event.key==='Enter')buscarCodigo()">
-<button onclick="buscarCodigo()">Agregar</button>
+<button class="btn-rojo" onclick="buscarCodigo()">Agregar</button>
 
 <table>
-<thead><tr><th>Nombre</th><th>Cant</th><th>Precio</th><th></th></tr></thead>
+<thead>
+<tr><th>Nombre</th><th>Cant</th><th>Precio</th><th></th></tr>
+</thead>
 <tbody id="carrito"></tbody>
 </table>
 
-<h3>Total: $<span id="total">0</span></h3>
+<h3 style="text-align:right;">Total: $<span id="total">0</span></h3>
+
 <button class="btn-rojo" onclick="pagar()">Pagar</button>
 
 </div>
@@ -70,57 +75,62 @@ import {
 getFirestore, collection, query, where, getDocs, addDoc, updateDoc, doc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-const firebaseConfig = { /* TU CONFIG / };
+const firebaseConfig = {
+apiKey: "TU_API_KEY",
+authDomain: "TU_AUTH",
+projectId: "TU_PROJECT"
+};
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 let carrito = [];
-let user=null, rol=null, sucursal=null;
-let cajaAbierta=false;
+let empleadoActual=null;
+let scanning=false;
 
-/ LOGIN /
+/* LOGIN /
 window.doLogin = async ()=>{
-const u=user=document.getElementById("user").value;
-const p=document.getElementById("pass").value;
+const u=user.value;
+const p=pass.value;
 
 const q=query(collection(db,"empleados"),where("usuario","==",u),where("password","==",p));
 const s=await getDocs(q);
 
-if(s.empty){alert("Error login");return;}
+if(s.empty){login-msg.textContent="Error login";return;}
 
-const d=s.docs[0].data();
-rol=d.rol; sucursal=d.sucursal;
-
-localStorage.setItem("user",u);
-localStorage.setItem("rol",rol);
-localStorage.setItem("sucursal",sucursal);
-
-init();
-};
-
-/ AUTO LOGIN /
-window.onload=()=>{
-if(localStorage.getItem("user")){
-user=localStorage.getItem("user");
-rol=localStorage.getItem("rol");
-sucursal=localStorage.getItem("sucursal");
-init();
-}
-};
-
-function init(){
+empleadoActual=u;
 login-view.classList.add("hidden");
 pos-view.classList.remove("hidden");
-empleado-label.innerText=user+" ("+rol+")";
-}
+empleado-label.textContent=u;
+};
 
 / LOGOUT /
-window.logout=()=>{localStorage.clear();location.reload();};
+window.logout=()=>location.reload();
+
+/ SCANNER /
+window.toggleScanner=()=>{
+scanner.classList.toggle("hidden");
+
+if(!scanner.classList.contains("hidden")){
+Quagga.init({
+inputStream:{type:"LiveStream",target:scanner},
+decoder:{readers:["ean_reader","code_128_reader"]}
+},()=>Quagga.start());
+
+Quagga.onDetected(d=>{
+if(scanning)return;
+scanning=true;
+const code=d.codeResult.code;
+Quagga.stop();
+scanner.classList.add("hidden");
+buscarCodigo(code);
+});
+}
+};
 
 / BUSCAR /
-window.buscarCodigo=async ()=>{
-const code=codigo-input.value;
+window.buscarCodigo=async(codeManual)=>{
+const code=codeManual || codigo-input.value;
 
 const q=query(collection(db,"productos"),where("codigo","==",code));
 const s=await getDocs(q);
@@ -128,9 +138,6 @@ const s=await getDocs(q);
 if(s.empty){alert("No existe");return;}
 
 const p=s.docs[0].data();
-
-if(p.stock<=0){alert("Sin stock");return;}
-
 carrito.push(p);
 render();
 };
@@ -143,16 +150,14 @@ carrito.forEach((p,i)=>{
 t+=p.precio;
 carrito.innerHTML+=<tr> <td>${p.nombre}</td> <td>1</td> <td>${p.precio}</td> <td><button onclick="del(${i})">X</button></td> </tr>;
 });
-total.innerText=t;
+total.textContent=t;
 }
 
-/ ELIMINAR /
+/ DELETE /
 window.del=i=>{carrito.splice(i,1);render();};
 
-/ PAGO + STOCK /
-window.pagar=async ()=>{
-if(!cajaAbierta){alert("Abrí caja");return;}
-
+/ PAGAR /
+window.pagar=async()=>{
 for(const p of carrito){
 const q=query(collection(db,"productos"),where("codigo","==",p.codigo));
 const s=await getDocs(q);
@@ -162,9 +167,8 @@ await updateDoc(ref,{stock:p.stock-1});
 
 await addDoc(collection(db,"ventas"),{
 fecha:Date.now(),
-user,
-sucursal,
-total:Number(total.innerText),
+empleado:empleadoActual,
+total:Number(total.textContent),
 items:carrito
 });
 
@@ -173,16 +177,68 @@ render();
 alert("Venta OK");
 };
 
-/ CAJA /
-window.abrirCaja=()=>{cajaAbierta=true;alert("Caja abierta");};
-window.cerrarCaja=()=>{cajaAbierta=false;alert("Caja cerrada");};
-
-/ DASHBOARD */
-window.dashboard=async ()=>{
+/ DASHBOARD /
+window.dashboard=async()=>{
 const s=await getDocs(collection(db,"ventas"));
-let total=0;
-s.forEach(d=>total+=d.data().total);
-alert("Total vendido: $"+total);
+
+let hoy=0, mes=0;
+let contador={};
+
+const now=new Date();
+
+s.forEach(d=>{
+const v=d.data();
+const f=new Date(v.fecha);
+
+if(f.toDateString()===now.toDateString()) hoy+=v.total;
+if(f.getMonth()===now.getMonth()) mes+=v.total;
+
+v.items.forEach(i=>{
+contador[i.nombre]=(contador[i.nombre]||0)+1;
+});
+});
+
+const ranking=Object.entries(contador)
+.sort((a,b)=>b[1]-a[1])
+.slice(0,5)
+.map(i=>i[0]+" ("+i[1]+")")
+.join("\n");
+
+alert(
+"DASHBOARD\n\n"+
+"Hoy: $"+hoy+"\n"+
+"Mes: $"+mes+"\n\n"+
+"Top productos:\n"+ranking
+);
+};
+
+/ HISTORIAL HOY /
+window.historialHoy=async()=>{
+const s=await getDocs(collection(db,"ventas"));
+let txt="VENTAS HOY\n\n";
+const now=new Date();
+
+s.forEach(d=>{
+const v=d.data();
+const f=new Date(v.fecha);
+if(f.toDateString()===now.toDateString()){
+txt+=${f.toLocaleTimeString()} - $${v.total}\n;
+}
+});
+
+alert(txt);
+};
+
+/ EXCEL */
+window.exportarExcel=async()=>{
+const s=await getDocs(collection(db,"ventas"));
+let data=[];
+s.forEach(d=>data.push(d.data()));
+
+const ws=XLSX.utils.json_to_sheet(data);
+const wb=XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(wb,ws,"Ventas");
+XLSX.writeFile(wb,"ventas.xlsx");
 };
 
 </script>
