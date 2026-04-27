@@ -1,105 +1,223 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Canocchi POS</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<title>Canocchi POS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Quagga2 (cámara) como script global -->
-  <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
+<!-- Quagga2 (cámara) -->
+<script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
 
-  <style>
-    body { font-family: Arial, sans-serif; padding: 10px; background:#f5f5f5; }
-    .hidden { display:none; }
-    .card { background:#fff; padding:15px; border-radius:8px; max-width:800px; margin:10px auto; box-shadow:0 2px 6px rgba(0,0,0,.1); }
-    table { width:100%; border-collapse: collapse; margin-top:10px; }
-    th, td { border:1px solid #ccc; padding:6px; font-size:14px; }
-    th { background:#eee; }
-    input, button { padding:8px; margin:4px 0; font-size:14px; }
-    button { cursor:pointer; }
-  </style>
+<!-- SheetJS para exportar Excel -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #f5f5f5;
+        margin: 0;
+        padding: 0;
+    }
+
+    .hidden { display: none; }
+
+    /* LOGIN MINIMALISTA */
+    #login-view {
+        max-width: 350px;
+        margin: 60px auto;
+        text-align: center;
+        padding: 20px;
+    }
+
+    #login-view img {
+        width: 170px;
+        margin-bottom: 25px;
+    }
+
+    input {
+        width: 100%;
+        padding: 10px;
+        margin: 6px 0;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+        font-size: 15px;
+    }
+
+    /* BOTONES ESTILO D */
+    .btn-rojo {
+        background: #E53935;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 6px;
+        font-weight: bold;
+        cursor: pointer;
+        margin-top: 8px;
+    }
+
+    .btn-negro {
+        background: #000;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 6px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    .btn-mini {
+        background: white;
+        border: 2px solid #E53935;
+        border-radius: 6px;
+        padding: 4px;
+        cursor: pointer;
+    }
+
+    .card {
+        background: #fff;
+        padding: 15px;
+        border-radius: 8px;
+        max-width: 900px;
+        margin: 15px auto;
+        box-shadow: 0 2px 6px rgba(0,0,0,.1);
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+    }
+
+    th, td {
+        border: 1px solid #ccc;
+        padding: 6px;
+        font-size: 14px;
+    }
+
+    th {
+        background: #eee;
+    }
+
+    #scanner-area {
+        width: 100%;
+        height: 250px;
+        background: #000;
+        margin-top: 10px;
+    }
+</style>
 </head>
 <body>
 
 <!-- LOGIN -->
-<div class="card" id="login-view">
-  <h2>Iniciar sesión</h2>
-  <label>Usuario</label><br>
-  <input id="user" placeholder="Usuario"><br>
-  <label>Contraseña</label><br>
-  <input id="pass" type="password" placeholder="Contraseña"><br>
-  <button onclick="doLogin()">Ingresar</button>
-  <div id="login-msg" style="color:red;margin-top:6px;"></div>
+<div id="login-view">
+    <img src="CanocchiLogo.PNG">
+    <input id="user" placeholder="Usuario">
+    <input id="pass" type="password" placeholder="Contraseña">
+    <button class="btn-rojo" onclick="doLogin()">Ingresar</button>
+    <div id="login-msg" style="color:red;margin-top:6px;"></div>
 </div>
 
 <!-- POS -->
-<div class="card hidden" id="pos-view">
-  <div style="display:flex;justify-content:space-between;align-items:center;">
-    <h3>Caja POS</h3>
-    <span>Empleado: <strong id="empleado-label"></strong></span>
-  </div>
-  <hr>
+<div id="pos-view" class="hidden card">
 
-  <h4>Escaneo / carga de producto</h4>
-  <input id="codigo-input"
-         placeholder="Escaneá con la pistola o escribí el código"
-         onkeydown="if(event.key==='Enter') buscarCodigo()">
-  <button onclick="buscarCodigo()">Agregar</button>
-  <button onclick="toggleCam()">Cámara</button>
-  <div id="scan-msg" style="color:green;margin-top:4px;"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h2>Canocchi POS</h2>
+        <span>Empleado: <strong id="empleado-label"></strong></span>
+    </div>
 
-  <div id="scanner-area" class="hidden"
-       style="width:100%;height:250px;background:#000;margin-top:10px;"></div>
+    <hr>
 
-  <h4>Carrito</h4>
-  <table>
-    <thead>
-      <tr>
-        <th>Código</th>
-        <th>Nombre</th>
-        <th>Cant.</th>
-        <th>Precio</th>
-        <th>Subtotal</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody id="carrito-body"></tbody>
-  </table>
+    <!-- BOTONES SUPERIORES -->
+    <div style="display:flex;gap:10px;margin-bottom:10px;">
+        <button class="btn-negro" onclick="exportarExcel()">
+            <img src="logoexcel.png" style="width:28px;">
+        </button>
 
-  <p style="text-align:right;margin-top:8px;">
-    Total: $<span id="total-label">0</span>
-  </p>
+        <button class="btn-negro" onclick="abrirAltaCategoria()">
+            <img src="agregar.png" style="width:28px;">
+        </button>
+    </div>
+
+    <h3>Escaneo / carga de producto</h3>
+
+    <input id="codigo-input" placeholder="Escaneá o escribí el código"
+           onkeydown="if(event.key==='Enter') buscarCodigo()">
+
+    <button class="btn-rojo" onclick="buscarCodigo()">Agregar</button>
+    <button class="btn-negro" onclick="toggleCam()">Cámara</button>
+
+    <div id="scan-msg" style="color:green;margin-top:4px;"></div>
+
+    <div id="scanner-area" class="hidden"></div>
+
+    <h3>Carrito</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Código</th>
+                <th>Nombre</th>
+                <th>Cant.</th>
+                <th>Precio</th>
+                <th>Subtotal</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="carrito-body"></tbody>
+    </table>
+
+    <p style="text-align:right;font-size:18px;margin-top:10px;">
+        Total: $<span id="total-label">0</span>
+    </p>
 </div>
 
-<!-- ALTA DE PRODUCTO -->
-<div class="card hidden" id="alta-container">
-  <h3>Agregar producto</h3>
-  <label>Código</label><br>
-  <input id="alta-codigo" readonly><br>
-  <label>Nombre</label><br>
-  <input id="alta-nombre"><br>
-  <label>Precio</label><br>
-  <input id="alta-precio" type="number" step="0.01"><br>
-  <label>Stock inicial</label><br>
-  <input id="alta-stock" type="number"><br>
-  <button onclick="guardarProducto()">Guardar</button>
-  <button onclick="document.getElementById('alta-container').classList.add('hidden')">Cancelar</button>
+<!-- ALTA PRODUCTO -->
+<div id="alta-container" class="hidden card">
+    <h3>Agregar producto</h3>
+
+    <label>Código</label>
+    <input id="alta-codigo" readonly>
+
+    <label>Nombre</label>
+    <input id="alta-nombre">
+
+    <label>Precio</label>
+    <input id="alta-precio" type="number" step="0.01">
+
+    <label>Stock inicial</label>
+    <input id="alta-stock" type="number">
+
+    <label>Categoría</label>
+    <select id="alta-categoria"></select>
+
+    <button class="btn-negro" onclick="abrirAltaCategoria()">Nueva categoría</button>
+    <br><br>
+
+    <button class="btn-rojo" onclick="guardarProducto()">Guardar</button>
+    <button class="btn-negro" onclick="cerrarAltaProducto()">Cancelar</button>
 </div>
 
-<!-- LÓGICA (Firebase + POS) -->
+<!-- ALTA CATEGORÍA -->
+<div id="alta-categoria-card" class="hidden card">
+    <h3>Nueva categoría</h3>
+    <input id="categoria-nombre" placeholder="Nombre de la categoría">
+    <button class="btn-rojo" onclick="guardarCategoria()">Guardar</button>
+    <button class="btn-negro" onclick="cerrarAltaCategoria()">Cancelar</button>
+</div>
+
+<!-- FIREBASE + LÓGICA -->
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-  import {
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import {
     getFirestore,
     collection,
     query,
     where,
     getDocs,
     addDoc
-  } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-  // TU CONFIG DE FIREBASE
-  const firebaseConfig = {
+const firebaseConfig = {
     apiKey: "AIzaSyB4gAWoETaf4f2O_eia4Nc9PraW_dkmeA4w",
     authDomain: "canocchi-store---stock-control.firebaseapp.com",
     projectId: "canocchi-store---stock-control",
@@ -107,205 +225,246 @@
     messagingSenderId: "106236604495",
     appId: "1:106236604495:web:2af8b907cc568d11fa1f5a",
     measurementId: "G-9EB7X6949"
-  };
+};
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-  let empleadoActual = null;
-  let carrito = [];
+let empleadoActual = null;
+let carrito = [];
+let scanning = false;
 
-  /* ---------- LOGIN ---------- */
-  window.doLogin = async function () {
-    const usuario = document.getElementById("user").value.trim();
-    const password = document.getElementById("pass").value.trim();
-    const msg = document.getElementById("login-msg");
-    msg.textContent = "";
-
-    if (!usuario || !password) {
-      msg.textContent = "Completá usuario y contraseña.";
-      return;
-    }
+/* LOGIN */
+window.doLogin = async function () {
+    const usuario = user.value.trim();
+    const password = pass.value.trim();
+    loginMsg.textContent = "";
 
     const q = query(
-      collection(db, "empleados"),
-      where("usuario", "==", usuario),
-      where("password", "==", password)
+        collection(db, "empleados"),
+        where("usuario", "==", usuario),
+        where("password", "==", password)
     );
 
     const snap = await getDocs(q);
 
     if (snap.empty) {
-      msg.textContent = "Usuario o contraseña incorrectos.";
-      return;
+        loginMsg.textContent = "Usuario o contraseña incorrectos.";
+        return;
     }
 
-    const data = snap.docs[0].data();
-    empleadoActual = data.nombre;
+    empleadoActual = snap.docs[0].data().nombre;
+    empleadoLabel.textContent = empleadoActual;
 
-    document.getElementById("empleado-label").textContent = data.nombre;
-    document.getElementById("login-view").classList.add("hidden");
-    document.getElementById("pos-view").classList.remove("hidden");
-  };
+    loginView.classList.add("hidden");
+    posView.classList.remove("hidden");
 
-  /* ---------- BUSCAR PRODUCTO ---------- */
-  window.buscarCodigo = async function (manualCode) {
-    const input = document.getElementById("codigo-input");
-    const codigo = (manualCode || input.value).trim();
-    const msg = document.getElementById("scan-msg");
-    msg.textContent = "";
+    cargarCategorias();
+};
+
+/* BUSCAR PRODUCTO */
+window.buscarCodigo = async function (manualCode) {
+    const codigo = (manualCode || codigoInput.value).trim();
+    scanMsg.textContent = "";
 
     if (!codigo) return;
 
     const q = query(
-      collection(db, "productos"),
-      where("codigo", "==", codigo),
-      where("activo", "==", true)
+        collection(db, "productos"),
+        where("codigo", "==", codigo),
+        where("activo", "==", true)
     );
 
     const snap = await getDocs(q);
 
     if (snap.empty) {
-      msg.textContent = "Producto no encontrado. Podés agregarlo.";
-      document.getElementById("alta-container").classList.remove("hidden");
-      document.getElementById("alta-codigo").value = codigo;
-      return;
+        scanMsg.textContent = "Producto no encontrado. Podés agregarlo.";
+        altaContainer.classList.remove("hidden");
+        altaCodigo.value = codigo;
+        return;
     }
 
     const prod = snap.docs[0].data();
     agregarAlCarrito(prod);
-    msg.textContent = "Producto agregado: " + prod.nombre;
 
-    input.value = "";
-    input.focus();
-  };
+    scanMsg.textContent = "Producto agregado: " + prod.nombre;
 
-  /* ---------- ALTA DE PRODUCTO ---------- */
-  window.guardarProducto = async function () {
-    const codigo = document.getElementById("alta-codigo").value.trim();
-    const nombre = document.getElementById("alta-nombre").value.trim();
-    const precio = Number(document.getElementById("alta-precio").value);
-    const stock = Number(document.getElementById("alta-stock").value);
+    codigoInput.value = "";
+    codigoInput.focus();
+};
 
-    if (!codigo || !nombre || !precio || !stock) {
-      alert("Completá todos los campos.");
-      return;
+/* ALTA PRODUCTO */
+window.guardarProducto = async function () {
+    const codigo = altaCodigo.value.trim();
+    const nombre = altaNombre.value.trim();
+    const precio = Number(altaPrecio.value);
+    const stock = Number(altaStock.value);
+    const categoria = altaCategoria.value;
+
+    if (!codigo || !nombre || !precio || !stock || !categoria) {
+        alert("Completá todos los campos.");
+        return;
     }
 
     await addDoc(collection(db, "productos"), {
-      codigo,
-      nombre,
-      precio,
-      stock,
-      activo: true
+        codigo, nombre, precio, stock, categoria, activo: true
     });
 
     alert("Producto agregado.");
-    document.getElementById("alta-container").classList.add("hidden");
-    document.getElementById("alta-nombre").value = "";
-    document.getElementById("alta-precio").value = "";
-    document.getElementById("alta-stock").value = "";
-  };
+    cerrarAltaProducto();
+};
 
-  /* ---------- CARRITO ---------- */
-  function agregarAlCarrito(prod) {
-    const existe = carrito.find(i => String(i.codigo) === String(prod.codigo));
-    if (existe) {
-      existe.cantidad++;
-    } else {
-      carrito.push({
-        codigo: prod.codigo,
-        nombre: prod.nombre,
-        precio: Number(prod.precio),
-        cantidad: 1
-      });
-    }
+window.cerrarAltaProducto = function () {
+    altaContainer.classList.add("hidden");
+    altaNombre.value = "";
+    altaPrecio.value = "";
+    altaStock.value = "";
+};
+
+/* CATEGORÍAS */
+async function cargarCategorias() {
+    const snap = await getDocs(collection(db, "categorias"));
+    altaCategoria.innerHTML = '<option value="">Seleccionar...</option>';
+
+    snap.forEach(doc => {
+        const c = doc.data();
+        altaCategoria.innerHTML += `<option value="${c.nombre}">${c.nombre}</option>`;
+    });
+}
+
+window.abrirAltaCategoria = function () {
+    altaCategoriaCard.classList.remove("hidden");
+};
+
+window.cerrarAltaCategoria = function () {
+    altaCategoriaCard.classList.add("hidden");
+    categoriaNombre.value = "";
+};
+
+window.guardarCategoria = async function () {
+    const nombre = categoriaNombre.value.trim();
+    if (!nombre) return alert("Ingresá un nombre.");
+
+    await addDoc(collection(db, "categorias"), { nombre });
+
+    alert("Categoría agregada.");
+    cerrarAltaCategoria();
+    cargarCategorias();
+};
+
+/* CARRITO */
+function agregarAlCarrito(prod) {
+    const existe = carrito.find(i => i.codigo == prod.codigo);
+
+    if (existe) existe.cantidad++;
+    else carrito.push({ ...prod, cantidad: 1 });
+
     renderCarrito();
-  }
+}
 
-  function renderCarrito() {
-    const tbody = document.getElementById("carrito-body");
-    tbody.innerHTML = "";
+function renderCarrito() {
+    carritoBody.innerHTML = "";
     let total = 0;
 
     carrito.forEach((item, i) => {
-      const sub = item.cantidad * item.precio;
-      total += sub;
+        const sub = item.cantidad * item.precio;
+        total += sub;
 
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${item.codigo}</td>
-        <td>${item.nombre}</td>
-        <td><input type="number" min="1" value="${item.cantidad}" style="width:60px;"></td>
-        <td>${item.precio.toFixed(2)}</td>
-        <td>${sub.toFixed(2)}</td>
-        <td><button>X</button></td>
-      `;
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${item.codigo}</td>
+            <td>${item.nombre}</td>
+            <td><input type="number" min="1" value="${item.cantidad}" style="width:60px;"></td>
+            <td>${item.precio.toFixed(2)}</td>
+            <td>${sub.toFixed(2)}</td>
+            <td>
+                <button class="btn-mini" onclick="eliminarItem(${i})">
+                    <img src="eliminar.png" style="width:20px;">
+                </button>
+            </td>
+        `;
 
-      tr.querySelector("input").onchange = (e) => {
-        const val = Number(e.target.value);
-        if (val <= 0 || isNaN(val)) {
-          carrito.splice(i, 1);
-        } else {
-          carrito[i].cantidad = val;
-        }
-        renderCarrito();
-      };
+        tr.querySelector("input").onchange = e => {
+            const val = Number(e.target.value);
+            if (val <= 0) carrito.splice(i, 1);
+            else carrito[i].cantidad = val;
+            renderCarrito();
+        };
 
-      tr.querySelector("button").onclick = () => {
-        carrito.splice(i, 1);
-        renderCarrito();
-      };
-
-      tbody.appendChild(tr);
+        carritoBody.appendChild(tr);
     });
 
-    document.getElementById("total-label").textContent = total.toFixed(2);
-  }
+    totalLabel.textContent = total.toFixed(2);
+}
 
-  /* ---------- CÁMARA (QUAGGA) ---------- */
-  window.toggleCam = function () {
-    const area = document.getElementById("scanner-area");
-    if (area.classList.contains("hidden")) {
-      area.classList.remove("hidden");
-      startQuagga();
+window.eliminarItem = function (i) {
+    carrito.splice(i, 1);
+    renderCarrito();
+};
+
+/* EXPORTAR EXCEL */
+window.exportarExcel = async function () {
+    const snap = await getDocs(collection(db, "ventas"));
+    const rows = [];
+
+    snap.forEach(doc => rows.push(doc.data()));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Ventas");
+
+    XLSX.writeFile(wb, "ventas.xlsx");
+};
+
+/* CÁMARA */
+window.toggleCam = function () {
+    if (scannerArea.classList.contains("hidden")) {
+        scannerArea.classList.remove("hidden");
+        startQuagga();
     } else {
-      area.classList.add("hidden");
-      try { Quagga.stop(); } catch(e) {}
+        scannerArea.classList.add("hidden");
+        try { Quagga.stop(); } catch(e) {}
     }
-  };
+};
 
-  function startQuagga() {
+function startQuagga() {
+    scanning = true;
+
     Quagga.init({
-      inputStream: {
-        type: "LiveStream",
-        target: document.querySelector("#scanner-area"),
-        constraints: { facingMode: "environment" }
-      },
-      decoder: {
-        readers: [
-          "ean_reader",
-          "ean_8_reader",
-          "upc_reader",
-          "upc_e_reader",
-          "code_128_reader",
-          "code_39_reader"
-        ]
-      }
+        inputStream: {
+            type: "LiveStream",
+            target: scannerArea,
+            constraints: { facingMode: "environment" }
+        },
+        decoder: {
+            readers: [
+                "ean_reader",
+                "ean_8_reader",
+                "upc_reader",
+                "upc_e_reader",
+                "code_128_reader",
+                "code_39_reader"
+            ]
+        }
     }, err => {
-      if (err) {
-        console.error(err);
-        return;
-      }
-      Quagga.start();
+        if (err) return console.error(err);
+        Quagga.start();
     });
 
     Quagga.onDetected(res => {
-      const code = res.codeResult.code;
-      buscarCodigo(code);
+        if (!scanning) return;
+        scanning = false;
+
+        const code = res.codeResult.code;
+
+        try { Quagga.stop(); } catch(e) {}
+        scannerArea.classList.add("hidden");
+
+        buscarCodigo(code);
     });
-  }
+}
 </script>
 
 </body>
 </html>
+
