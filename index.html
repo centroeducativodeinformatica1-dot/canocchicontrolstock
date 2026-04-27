@@ -2,282 +2,242 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Caja POS</title>
+  <title>Canocchi POS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    // IMPORTS FIREBASE
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs, addDoc, updateDoc, doc } 
+      from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // 🔥🔥🔥 PEGÁ ACÁ TU firebaseConfig 🔥🔥🔥
+    const firebaseConfig = {
+      apiKey: "AIzaSyB4gAWoETaf4f2O_eia4Nc9PraW_dkmeA4w",
+      authDomain: "canocchi-store---stock-control.firebaseapp.com",
+      projectId: "canocchi-store---stock-control",
+      storageBucket: "canocchi-store---stock-control.firebasestorage.app",
+      messagingSenderId: "106236604495",
+      appId: "1:106236604495:web:2af8b907cc568d11fa1f5a",
+      measurementId: "G-9EB7X6949"
+    };
+
+    // Inicializar Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // VARIABLES
+    let empleadoActual = null;
+    let carrito = [];
+
+    /* ---------------- LOGIN ---------------- */
+    window.doLogin = async function () {
+      const usuario = document.getElementById("user").value.trim();
+      const password = document.getElementById("pass").value.trim();
+      const msg = document.getElementById("login-msg");
+
+      const q = query(
+        collection(db, "empleados"),
+        where("usuario", "==", usuario),
+        where("password", "==", password)
+      );
+
+      const snap = await getDocs(q);
+
+      if (snap.empty) {
+        msg.textContent = "Usuario o contraseña incorrectos";
+        return;
+      }
+
+      const data = snap.docs[0].data();
+      empleadoActual = data.nombre;
+
+      document.getElementById("empleado-label").textContent = data.nombre;
+      document.getElementById("login-view").classList.add("hidden");
+      document.getElementById("pos-view").classList.remove("hidden");
+    };
+
+    /* ---------------- BUSCAR PRODUCTO ---------------- */
+    window.buscarCodigo = async function (manualCode) {
+      const input = document.getElementById("codigo-input");
+      const codigo = (manualCode || input.value).trim();
+      const msg = document.getElementById("scan-msg");
+      msg.textContent = "";
+
+      if (!codigo) return;
+
+      const q = query(
+        collection(db, "productos"),
+        where("codigo", "==", codigo),
+        where("activo", "==", true)
+      );
+
+      const snap = await getDocs(q);
+
+      if (snap.empty) {
+        msg.textContent = "Producto no encontrado";
+        document.getElementById("alta-container").classList.remove("hidden");
+        document.getElementById("alta-codigo").value = codigo;
+        return;
+      }
+
+      const prod = snap.docs[0].data();
+      agregarAlCarrito(prod);
+      msg.textContent = "Producto agregado: " + prod.nombre;
+
+      input.value = "";
+      input.focus();
+    };
+
+    /* ---------------- AGREGAR PRODUCTO ---------------- */
+    window.guardarProducto = async function () {
+      const codigo = document.getElementById("alta-codigo").value;
+      const nombre = document.getElementById("alta-nombre").value;
+      const precio = Number(document.getElementById("alta-precio").value);
+      const stock = Number(document.getElementById("alta-stock").value);
+
+      await addDoc(collection(db, "productos"), {
+        codigo,
+        nombre,
+        precio,
+        stock,
+        activo: true
+      });
+
+      alert("Producto agregado");
+      document.getElementById("alta-container").classList.add("hidden");
+    };
+
+    /* ---------------- CARRITO ---------------- */
+    function agregarAlCarrito(prod) {
+      const existe = carrito.find(i => i.codigo === prod.codigo);
+      if (existe) existe.cantidad++;
+      else carrito.push({ ...prod, cantidad: 1 });
+
+      renderCarrito();
+    }
+
+    function renderCarrito() {
+      const tbody = document.getElementById("carrito-body");
+      tbody.innerHTML = "";
+      let total = 0;
+
+      carrito.forEach((item, i) => {
+        const sub = item.cantidad * item.precio;
+        total += sub;
+
+        tbody.innerHTML += `
+          <tr>
+            <td>${item.codigo}</td>
+            <td>${item.nombre}</td>
+            <td><input type="number" min="1" value="${item.cantidad}" onchange="cambiarCantidad(${i}, this.value)"></td>
+            <td>${item.precio}</td>
+            <td>${sub}</td>
+            <td><button onclick="eliminarItem(${i})">X</button></td>
+          </tr>
+        `;
+      });
+
+      document.getElementById("total-label").textContent = total;
+    }
+
+    window.cambiarCantidad = function (i, val) {
+      carrito[i].cantidad = Number(val);
+      renderCarrito();
+    };
+
+    window.eliminarItem = function (i) {
+      carrito.splice(i, 1);
+      renderCarrito();
+    };
+
+    /* ---------------- ESCANEO CON CÁMARA ---------------- */
+    import "https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js";
+
+    window.toggleCam = function () {
+      const area = document.getElementById("scanner-area");
+      if (area.classList.contains("hidden")) {
+        area.classList.remove("hidden");
+        startQuagga();
+      } else {
+        area.classList.add("hidden");
+        Quagga.stop();
+      }
+    };
+
+    function startQuagga() {
+      Quagga.init({
+        inputStream: {
+          type: "LiveStream",
+          target: document.querySelector("#scanner-area"),
+          constraints: { facingMode: "environment" }
+        },
+        decoder: { readers: ["ean_reader", "code_128_reader"] }
+      }, err => {
+        if (err) return console.error(err);
+        Quagga.start();
+      });
+
+      Quagga.onDetected(res => {
+        const code = res.codeResult.code;
+        buscarCodigo(code);
+      });
+    }
+  </script>
+
   <style>
-    body { font-family: Arial, sans-serif; padding: 10px; background:#f5f5f5; }
-    .card { background:#fff; padding:15px; border-radius:8px; max-width:700px; margin:10px auto; box-shadow:0 2px 6px rgba(0,0,0,.1); }
+    body { font-family: Arial; padding: 10px; }
     .hidden { display:none; }
-    input, button { padding:8px; margin:4px 0; font-size:14px; }
-    button { cursor:pointer; }
-    table { width:100%; border-collapse: collapse; margin-top:10px; background:#fff; }
-    th, td { border:1px solid #ddd; padding:6px; font-size:13px; text-align:left; }
-    th { background:#f0f0f0; }
-    #total-label { font-weight:bold; }
-    .right { text-align:right; }
+    .card { background:#fff; padding:15px; border-radius:8px; max-width:700px; margin:auto; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { border:1px solid #ccc; padding:6px; }
   </style>
 </head>
+
 <body>
 
 <div class="card" id="login-view">
   <h2>Iniciar sesión</h2>
-  <label>Usuario</label><br>
   <input id="user" placeholder="Usuario"><br>
-  <label>Contraseña</label><br>
   <input id="pass" type="password" placeholder="Contraseña"><br>
   <button onclick="doLogin()">Ingresar</button>
-  <div id="login-msg" style="color:red;margin-top:6px;"></div>
+  <div id="login-msg" style="color:red;"></div>
 </div>
 
 <div class="card hidden" id="pos-view">
-  <div style="display:flex;justify-content:space-between;align-items:center;">
-    <h3>Caja POS</h3>
-    <button onclick="logout()">Salir</button>
-  </div>
-  <p>Empleado: <strong id="empleado-label"></strong></p>
+  <h3>Caja POS</h3>
+  Empleado: <span id="empleado-label"></span>
   <hr>
 
-  <h4>Escaneo / carga de producto</h4>
-  <input id="codigo-input"
-         placeholder="Escaneá con la pistola o escribí el código"
-         autofocus
-         onkeydown="if(event.key==='Enter') buscarCodigo()">
+  <h4>Escaneo</h4>
+  <input id="codigo-input" placeholder="Escaneá o escribí" onkeydown="if(event.key==='Enter') buscarCodigo()">
   <button onclick="buscarCodigo()">Agregar</button>
-  <div id="scan-msg" style="color:green;margin-top:4px;"></div>
+  <button onclick="toggleCam()">Cámara</button>
+  <div id="scan-msg" style="color:green;"></div>
+
+  <div id="scanner-area" class="hidden" style="width:100%;height:250px;background:#000;margin-top:10px;"></div>
 
   <h4>Carrito</h4>
   <table>
     <thead>
-      <tr>
-        <th>Código</th>
-        <th>Nombre</th>
-        <th>Cant.</th>
-        <th>Precio</th>
-        <th>Subtotal</th>
-        <th></th>
-      </tr>
+      <tr><th>Código</th><th>Nombre</th><th>Cant.</th><th>Precio</th><th>Subtotal</th><th></th></tr>
     </thead>
     <tbody id="carrito-body"></tbody>
   </table>
 
-  <div class="right" style="margin-top:8px;">
-    Total: $<span id="total-label">0.00</span>
-  </div>
-
-  <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
-    <button onclick="confirmarVenta()">Confirmar venta</button>
-    <button onclick="imprimirTicket()">Imprimir ticket</button>
-  </div>
-
-  <iframe id="ticket-frame" class="hidden"></iframe>
+  <p>Total: $<span id="total-label">0</span></p>
 </div>
 
-<script>
-// URL de tu WebApp de Apps Script
-const API = "https://script.google.com/macros/s/AKfycbzpWqLztewkXOcv8kVdjQZy7rhIgvoGxfzItPTVCXx_hdAI3Q6TpTYnRmn7FGj39eS_/exec";
-
-let empleadoActual = null;
-let carrito = [];
-
-/* ---------- LOGIN ---------- */
-async function doLogin() {
-  const usuario = document.getElementById("user").value.trim();
-  const password = document.getElementById("pass").value.trim();
-  const msg = document.getElementById("login-msg");
-  msg.textContent = "";
-
-  if (!usuario || !password) {
-    msg.textContent = "Completá usuario y contraseña.";
-    return;
-  }
-
-  try {
-    const url = `${API}?action=login&usuario=${encodeURIComponent(usuario)}&password=${encodeURIComponent(password)}`;
-    const res = await fetch(url);
-    const data = await res.json();
-
-    if (data.ok) {
-      empleadoActual = data.nombre;
-      document.getElementById("empleado-label").textContent = data.nombre;
-      document.getElementById("login-view").classList.add("hidden");
-      document.getElementById("pos-view").classList.remove("hidden");
-    } else {
-      msg.textContent = data.msg || "Error de login.";
-    }
-  } catch (err) {
-    console.error(err);
-    msg.textContent = "No se pudo conectar al servidor.";
-  }
-}
-
-function logout() {
-  empleadoActual = null;
-  carrito = [];
-  renderCarrito();
-  document.getElementById("pos-view").classList.add("hidden");
-  document.getElementById("login-view").classList.remove("hidden");
-}
-
-/* ---------- BUSCAR PRODUCTO ---------- */
-async function buscarCodigo(codeManual) {
-  const input = document.getElementById("codigo-input");
-  const codigo = (codeManual || input.value).trim();
-  const scanMsg = document.getElementById("scan-msg");
-  scanMsg.textContent = "";
-
-  if (!codigo) return;
-
-  try {
-    const url = `${API}?action=buscar&codigo=${encodeURIComponent(codigo)}`;
-    const res = await fetch(url);
-    const data = await res.json();
-
-    if (data.ok) {
-      agregarAlCarrito(data);
-      scanMsg.textContent = "Producto agregado: " + data.nombre;
-    } else {
-      scanMsg.textContent = data.msg || "Producto no encontrado.";
-    }
-  } catch (err) {
-    console.error(err);
-    scanMsg.textContent = "Error al buscar producto.";
-  }
-
-  input.value = "";
-  input.focus();
-}
-
-/* ---------- CARRITO ---------- */
-function agregarAlCarrito(prod) {
-  const existe = carrito.find(i => String(i.codigo) === String(prod.codigo));
-  if (existe) {
-    existe.cantidad++;
-  } else {
-    carrito.push({
-      codigo: prod.codigo,
-      nombre: prod.nombre,
-      precio: Number(prod.precio),
-      cantidad: 1
-    });
-  }
-  renderCarrito();
-}
-
-function cambiarCantidad(i, val) {
-  const cant = Number(val);
-  if (cant <= 0 || isNaN(cant)) {
-    carrito.splice(i, 1);
-  } else {
-    carrito[i].cantidad = cant;
-  }
-  renderCarrito();
-}
-
-function eliminarItem(i) {
-  carrito.splice(i, 1);
-  renderCarrito();
-}
-
-function renderCarrito() {
-  const tbody = document.getElementById("carrito-body");
-  tbody.innerHTML = "";
-  let total = 0;
-
-  carrito.forEach((item, i) => {
-    const sub = item.cantidad * item.precio;
-    total += sub;
-
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${item.codigo}</td>
-      <td>${item.nombre}</td>
-      <td><input type="number" min="1" value="${item.cantidad}" style="width:60px;"></td>
-      <td>${item.precio.toFixed(2)}</td>
-      <td>${sub.toFixed(2)}</td>
-      <td><button>X</button></td>
-    `;
-
-    tr.querySelector("input").onchange = (e) => cambiarCantidad(i, e.target.value);
-    tr.querySelector("button").onclick = () => eliminarItem(i);
-
-    tbody.appendChild(tr);
-  });
-
-  document.getElementById("total-label").textContent = total.toFixed(2);
-}
-
-/* ---------- CONFIRMAR VENTA ---------- */
-async function confirmarVenta() {
-  if (!empleadoActual) {
-    alert("No hay empleado logueado.");
-    return;
-  }
-  if (carrito.length === 0) {
-    alert("Carrito vacío.");
-    return;
-  }
-
-  try {
-    const res = await fetch(API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "venta",
-        empleado: empleadoActual,
-        carrito: carrito
-      })
-    });
-
-    const data = await res.json();
-    if (data.ok) {
-      alert("Venta registrada correctamente.");
-      carrito = [];
-      renderCarrito();
-    } else {
-      alert(data.msg || "Error al registrar venta.");
-    }
-  } catch (err) {
-    console.error(err);
-    alert("No se pudo conectar al servidor.");
-  }
-}
-
-/* ---------- TICKET ---------- */
-function imprimirTicket() {
-  if (carrito.length === 0) {
-    alert("Carrito vacío.");
-    return;
-  }
-
-  let html = "<html><body><h3>Ticket</h3>";
-  html += "<p>Empleado: " + (empleadoActual || "") + "</p>";
-  html += "<table border='1' cellspacing='0' cellpadding='4'>";
-  html += "<tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr>";
-
-  let total = 0;
-  carrito.forEach(item => {
-    const sub = item.cantidad * item.precio;
-    total += sub;
-    html += `<tr>
-      <td>${item.nombre}</td>
-      <td>${item.cantidad}</td>
-      <td>${item.precio.toFixed(2)}</td>
-      <td>${sub.toFixed(2)}</td>
-    </tr>`;
-  });
-
-  html += `<tr><td colspan="3"><b>Total</b></td><td><b>${total.toFixed(2)}</b></td></tr>`;
-  html += "</table></body></html>";
-
-  const frame = document.getElementById("ticket-frame");
-  frame.classList.remove("hidden");
-  const doc = frame.contentWindow.document;
-  doc.open();
-  doc.write(html);
-  doc.close();
-  frame.contentWindow.print();
-}
-</script>
+<!-- ALTA DE PRODUCTO -->
+<div class="card hidden" id="alta-container">
+  <h3>Agregar producto</h3>
+  Código: <input id="alta-codigo" readonly><br>
+  Nombre: <input id="alta-nombre"><br>
+  Precio: <input id="alta-precio" type="number"><br>
+  Stock: <input id="alta-stock" type="number"><br>
+  <button onclick="guardarProducto()">Guardar</button>
+</div>
 
 </body>
 </html>
