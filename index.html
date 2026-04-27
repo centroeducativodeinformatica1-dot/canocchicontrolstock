@@ -1,20 +1,31 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Test Login</title>
+<title>Canocchi</title>
+
+<style>
+body { font-family: Arial; }
+
+#app { display:none; }
+</style>
 </head>
 
 <body>
 
-<h2>Login</h2>
+<!-- LOGIN -->
+<div id="login">
+  <h2>Login</h2>
+  <input id="user" placeholder="Usuario"><br><br>
+  <input id="pass" type="password" placeholder="Contraseña"><br><br>
+  <button onclick="login()">Entrar</button>
+  <p id="msg"></p>
+</div>
 
-<input id="user" placeholder="Usuario"><br><br>
-<input id="pass" type="password" placeholder="Contraseña"><br><br>
-
-<button onclick="login()">Entrar</button>
-
-<p id="msg"></p>
+<!-- APP -->
+<div id="app">
+  <h1>BIENVENIDO AL SISTEMA ✔</h1>
+</div>
 
 <script>
 function login() {
@@ -22,7 +33,11 @@ function login() {
   var p = document.getElementById("pass").value;
 
   if (u === "Canocchi" && p === "Guemes1194") {
-    document.getElementById("msg").innerText = "ENTRASTE ✔";
+
+    // 🔥 CLAVE (esto te faltaba)
+    document.getElementById("login").style.display = "none";
+    document.getElementById("app").style.display = "block";
+
   } else {
     document.getElementById("msg").innerText = "ERROR";
   }
