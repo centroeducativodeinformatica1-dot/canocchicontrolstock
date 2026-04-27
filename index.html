@@ -5,8 +5,6 @@
 <title>Canocchi POS</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
-
 <style>
 body{font-family:Arial;background:#f5f5f5;margin:0;}
 .hidden{display:none;}
@@ -15,16 +13,15 @@ body{font-family:Arial;background:#f5f5f5;margin:0;}
 input{width:100%;padding:10px;margin:6px 0;border-radius:6px;border:1px solid #ccc;}
 .btn{padding:10px;border:none;border-radius:6px;cursor:pointer;}
 .btn-rojo{background:#E53935;color:#fff;}
-.btn-negro{background:#000;color:#fff;}
 .card{background:#fff;padding:15px;border-radius:8px;max-width:900px;margin:15px auto;}
 table{width:100%;border-collapse:collapse;}
 td,th{border:1px solid #ccc;padding:6px;}
-#scanner{width:100%;height:250px;background:#000;margin-top:10px;}
 </style>
 </head>
 
 <body>
 
+<!-- LOGIN -->
 <div id="login-view">
 <img src="CanocchiLogo.PNG">
 <input id="user" placeholder="Usuario">
@@ -33,6 +30,7 @@ td,th{border:1px solid #ccc;padding:6px;}
 <div id="login-msg" style="color:red;"></div>
 </div>
 
+<!-- POS -->
 <div id="pos-view" class="hidden card">
 
 <div style="display:flex;justify-content:space-between;">
@@ -45,87 +43,119 @@ td,th{border:1px solid #ccc;padding:6px;}
 
 <hr>
 
-<input id="codigo-input" placeholder="Código">
+<input id="codigo-input" placeholder="Código producto">
 
 <table>
 <thead>
-<tr><th>Producto</th><th>Precio</th><th></th></tr>
+<tr>
+<th>Producto</th>
+<th>Precio</th>
+<th></th>
+</tr>
 </thead>
-<tbody id="carrito"></tbody>
+<tbody id="carrito-body"></tbody>
 </table>
 
 <h3 style="text-align:right;">Total: $<span id="total">0</span></h3>
-
-<button class="btn btn-rojo hidden" id="btnPagar">Pagar</button>
 
 </div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, getDocs, addDoc } 
+import { getFirestore, collection, getDocs } 
 from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-const app = initializeApp({
-apiKey:"AIzaSyBg4WAoETa4fzO_eia4Nc9PraW_dkmeA4w",
-projectId:"canocchi-store---stock-control"
-});
+const firebaseConfig = {
+  apiKey: "AIzaSyBg4WAoETa4fzO_eia4Nc9PraW_dkmeA4w",
+  authDomain: "canocchi-store---stock-control.firebaseapp.com",
+  projectId: "canocchi-store---stock-control"
+};
 
+const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-let carrito=[];
-let empleado=null;
+let carrito = [];
+let empleado = null;
 
 // LOGIN
-document.getElementById("btnLogin").onclick=async()=>{
-const u=user.value.trim();
-const p=pass.value.trim();
+document.getElementById("btnLogin").addEventListener("click", async ()=>{
 
-const snap=await getDocs(collection(db,"empleados"));
+const u = document.getElementById("user").value.trim();
+const p = document.getElementById("pass").value.trim();
 
-let ok=false;
+const snap = await getDocs(collection(db,"empleados"));
 
-snap.forEach(d=>{
-const data=d.data();
-if(data.usuario===u && data.password===p) ok=true;
+let ok = false;
+
+snap.forEach(doc=>{
+const data = doc.data();
+if(data.usuario === u && data.password === p){
+ok = true;
+}
 });
 
 if(!ok){
-document.getElementById("login-msg").textContent="Datos incorrectos";
+document.getElementById("login-msg").textContent = "Usuario o contraseña incorrectos";
 return;
 }
 
-empleado=u;
-login-view.classList.add("hidden");
-pos-view.classList.remove("hidden");
-empleado-label.textContent=u;
+// LOGIN OK
+empleado = u;
+
+document.getElementById("login-view").classList.add("hidden");
+document.getElementById("pos-view").classList.remove("hidden");
+document.getElementById("empleado-label").textContent = u;
+
+});
+
+// LOGOUT
+document.getElementById("logoutBtn").addEventListener("click", ()=>{
+location.reload();
+});
+
+// AGREGAR PRODUCTO (DEMO SIMPLE)
+document.getElementById("codigo-input").addEventListener("keydown", e=>{
+if(e.key === "Enter"){
+agregarProductoDemo();
+}
+});
+
+function agregarProductoDemo(){
+
+const producto = {
+nombre: "Producto demo",
+precio: 1000
 };
 
-// AGREGAR PRODUCTO
-codigo-input.addEventListener("keydown",e=>{
-if(e.key==="Enter"){
-carrito.push({nombre:"Producto",precio:100});
+carrito.push(producto);
 render();
 }
-});
 
-// RENDER (SIN ERRORES)
+// RENDER
 function render(){
-let total=0;
-carrito.innerHTML="";
 
-carrito.forEach((p,i)=>{
-total+=p.precio;
+let total = 0;
+const tbody = document.getElementById("carrito-body");
+tbody.innerHTML = "";
 
-document.getElementById("carrito").innerHTML += <tr> <td>${p.nombre}</td> <td>${p.precio}</td> <td><button onclick="del(${i})">X</button></td> </tr>;
+carrito.forEach((item, index)=>{
+
+total += item.precio;
+
+const row = <tr> <td>${item.nombre}</td> <td>${item.precio}</td> <td><button onclick="eliminar(${index})">X</button></td> </tr>;
+
+tbody.innerHTML += row;
+
 });
 
-document.getElementById("total").textContent=total;
+document.getElementById("total").textContent = total;
+
 }
 
-// DELETE
-window.del=i=>{
-carrito.splice(i,1);
+// ELIMINAR
+window.eliminar = function(index){
+carrito.splice(index,1);
 render();
 };
 
