@@ -1,4 +1,4 @@
-!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -8,16 +8,6 @@
 body {
   font-family: Arial;
   padding: 20px;
-}
-
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.logo {
-  height: 60px;
 }
 
 input, button {
@@ -33,10 +23,7 @@ input, button {
 
 <body>
 
-<div class="header">
-  <h2>Canocchi Control</h2>
-  <img src="logo.png" class="logo">
-</div>
+<h2>Canocchi Control</h2>
 
 <h3>Agregar producto</h3>
 <input id="nombre" placeholder="Nombre">
@@ -60,19 +47,20 @@ input, button {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-// 🔥 TU CONFIG (YA LISTA)
+// 🔥 TU CONFIG (ya incluida)
 const firebaseConfig = {
   apiKey: "AIzaSyDSKVd4-PMXxupXvil7Hbfpt6EZbOKef4o",
   authDomain: "control-dee-stock-canocchi.firebaseapp.com",
   projectId: "control-dee-stock-canocchi",
   storageBucket: "control-dee-stock-canocchi.firebasestorage.app",
   messagingSenderId: "100048512779",
-  appId: "1:100048512779:web:bc5bbcb7134a8758aca40e",
-  measurementId: "G-6V00ED8HG7"
+  appId: "1:100048512779:web:bc5bbcb7134a8758aca40e"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
+console.log("🔥 Firebase conectado");
 
 let productos = [];
 let carrito = [];
@@ -93,13 +81,18 @@ window.agregarProducto = async function() {
   let cantidad = parseInt(document.getElementById("cantidad").value);
   let codigo = document.getElementById("codigo").value;
 
+  if (!nombre || !precio || !cantidad || !codigo) {
+    alert("Completá todos los campos");
+    return;
+  }
+
   await addDoc(collection(db, "productos"), {
     nombre, precio, cantidad, codigo
   });
 
   alert("Producto guardado");
   cargarProductos();
-}
+};
 
 // 🔫 Escáner
 document.getElementById("scanner").addEventListener("change", function() {
@@ -134,6 +127,11 @@ function renderCarrito() {
 
 // 💸 Confirmar venta
 window.confirmarVenta = async function() {
+  if (carrito.length === 0) {
+    alert("No hay productos");
+    return;
+  }
+
   let fecha = new Date();
   let total = 0;
 
@@ -156,20 +154,18 @@ window.confirmarVenta = async function() {
   await cargarProductos();
   renderCarrito();
   resumenHoy();
-}
+};
 
-// 📊 Resumen del día
+// 📊 Resumen
 async function resumenHoy() {
   const snapshot = await getDocs(collection(db, "ventas"));
 
   let hoy = new Date().toLocaleDateString();
-
   let total = 0;
   let cantidad = 0;
 
   snapshot.forEach(docu => {
     let v = docu.data();
-
     if (v.fecha === hoy) {
       total += v.total;
       cantidad += v.items.length;
