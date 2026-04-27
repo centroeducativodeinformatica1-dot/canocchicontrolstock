@@ -1,258 +1,288 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <base target="_top">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-      body { font-family: Arial, sans-serif; padding: 10px; }
-      .hidden { display:none; }
-      table { border-collapse: collapse; width: 100%; }
-      th, td { border: 1px solid #ccc; padding: 4px; font-size: 13px; }
-      #scanner-area { width: 100%; max-height: 260px; background:#000; margin:8px 0; }
-      input, button { padding:6px; margin:3px 0; }
-    </style>
-    <?!= include('quagga'); ?>
-  </head>
-  <body>
-    <!-- LOGIN -->
-    <div id="login-view">
-      <h3>Login de empleado</h3>
-      <input id="user" placeholder="Usuario"><br>
-      <input id="pass" type="password" placeholder="Contraseña"><br>
-      <button onclick="doLogin()">Ingresar</button>
-      <div id="login-msg" style="color:red;"></div>
-    </div>
+<head>
+  <meta charset="UTF-8">
+  <title>Caja POS</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- CAJA -->
-    <div id="pos-view" class="hidden">
-      <div>
-        Empleado: <span id="empleado-label"></span>
-        <button onclick="logout()" style="float:right;">Salir</button>
-      </div>
-      <hr>
+  <style>
+    body { font-family: Arial; padding: 10px; }
+    .hidden { display:none; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { border:1px solid #ccc; padding:6px; font-size:14px; }
+    input, button { padding:8px; margin:4px 0; }
+    #scanner-area { width:100%; height:260px; background:#000; margin-top:10px; }
+  </style>
 
-      <!-- Escaneo -->
-      <h4>Escaneo</h4>
-      <label>Código (pistola o teclado):</label><br>
-      <input id="codigo-input" autofocus onkeydown="codigoKey(event)">
-      <button onclick="buscarCodigo()">Agregar</button>
-      <button onclick="toggleCam()">Usar cámara</button>
+  <!-- Quagga2 para escaneo con cámara -->
+  <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
+</head>
 
-      <div id="scanner-area" class="hidden"></div>
-      <div id="scan-msg" style="color:green;"></div>
+<body>
 
-      <!-- Carrito -->
-      <h4>Carrito</h4>
-      <table id="carrito-table">
-        <thead>
-          <tr>
-            <th>Código</th><th>Nombre</th><th>Cant.</th><th>Precio</th><th>Subtotal</th><th></th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-      <div style="text-align:right;margin-top:5px;">
-        Total: $<span id="total-label">0.00</span>
-      </div>
+<!-- LOGIN -->
+<div id="login-view">
+  <h2>Iniciar sesión</h2>
+  <input id="user" placeholder="Usuario"><br>
+  <input id="pass" type="password" placeholder="Contraseña"><br>
+  <button onclick="doLogin()">Ingresar</button>
+  <div id="login-msg" style="color:red;"></div>
+</div>
 
-      <button onclick="confirmarVenta()">Confirmar venta</button>
-      <button onclick="imprimirTicket()">Imprimir ticket</button>
-      <button onclick="descargarVentas()">Descargar ventas (Excel)</button>
+<!-- CAJA -->
+<div id="pos-view" class="hidden">
+  <h3>Caja POS</h3>
+  Empleado: <span id="empleado-label"></span>
+  <button onclick="logout()" style="float:right;">Salir</button>
+  <hr>
 
-      <iframe id="ticket-frame" class="hidden"></iframe>
-    </div>
+  <h4>Escaneo</h4>
+  <input id="codigo-input" placeholder="Escaneá con pistola" autofocus onkeydown="if(event.key==='Enter') buscarCodigo()">
+  <button onclick="buscarCodigo()">Agregar</button>
+  <button onclick="toggleCam()">Usar cámara</button>
 
-    <script>
-      let empleadoActual = null;
-      let carrito = [];
-      let camActiva = false;
+  <div id="scanner-area" class="hidden"></div>
+  <div id="scan-msg" style="color:green;"></div>
 
-      function doLogin() {
-        const u = document.getElementById('user').value.trim();
-        const p = document.getElementById('pass').value.trim();
-        google.script.run.withSuccessHandler(res => {
-          if (res.ok) {
-            empleadoActual = res.nombre;
-            document.getElementById('empleado-label').textContent = res.nombre;
-            document.getElementById('login-view').classList.add('hidden');
-            document.getElementById('pos-view').classList.remove('hidden');
-            document.getElementById('login-msg').textContent = '';
-            document.getElementById('codigo-input').focus();
-          } else {
-            document.getElementById('login-msg').textContent = res.msg;
-          }
-        }).login(u, p);
-      }
+  <h4>Carrito</h4>
+  <table>
+    <thead>
+      <tr>
+        <th>Código</th><th>Nombre</th><th>Cant.</th><th>Precio</th><th>Subtotal</th><th></th>
+      </tr>
+    </thead>
+    <tbody id="carrito-body"></tbody>
+  </table>
 
-      function logout() {
-        empleadoActual = null;
-        carrito = [];
-        renderCarrito();
-        document.getElementById('pos-view').classList.add('hidden');
-        document.getElementById('login-view').classList.remove('hidden');
-      }
+  <div style="text-align:right;margin-top:10px;">
+    Total: $<span id="total-label">0.00</span>
+  </div>
 
-      function codigoKey(e) {
-        if (e.key === 'Enter') {
-          buscarCodigo();
-        }
-      }
+  <button onclick="confirmarVenta()">Confirmar venta</button>
+  <button onclick="imprimirTicket()">Imprimir ticket</button>
+  <button onclick="descargarVentas()">Descargar ventas</button>
 
-      function buscarCodigo(codigoManual) {
-        const input = document.getElementById('codigo-input');
-        const codigo = (codigoManual || input.value).trim();
-        if (!codigo) return;
-        google.script.run.withSuccessHandler(res => {
-          if (res.ok) {
-            agregarAlCarrito(res);
-            document.getElementById('scan-msg').textContent = 'Producto agregado: ' + res.nombre;
-          } else {
-            document.getElementById('scan-msg').textContent = res.msg;
-          }
-          input.value = '';
-          input.focus();
-        }).buscarProductoPorCodigo(codigo);
-      }
+  <iframe id="ticket-frame" class="hidden"></iframe>
+</div>
 
-      function agregarAlCarrito(prod) {
-        const existente = carrito.find(i => i.codigo == prod.codigo);
-        if (existente) {
-          existente.cantidad += 1;
-        } else {
-          carrito.push({
-            codigo: prod.codigo,
-            nombre: prod.nombre,
-            precio: Number(prod.precio),
-            cantidad: 1
-          });
-        }
-        renderCarrito();
-      }
+<script>
+const API = "https://script.google.com/macros/s/AKfycbxpZjKmsBXBPEGingrDeT8Umuc3YzGNe_O4i5ptZdSb3yZynAzmauFuSyrTizC2fk9T/exec";
 
-      function cambiarCantidad(idx, valor) {
-        const cant = Number(valor);
-        if (cant <= 0 || isNaN(cant)) {
-          carrito.splice(idx, 1);
-        } else {
-          carrito[idx].cantidad = cant;
-        }
-        renderCarrito();
-      }
+let empleadoActual = null;
+let carrito = [];
+let camActiva = false;
 
-      function eliminarItem(idx) {
-        carrito.splice(idx, 1);
-        renderCarrito();
-      }
+/* ---------------- LOGIN ---------------- */
+async function doLogin() {
+  const usuario = document.getElementById("user").value;
+  const password = document.getElementById("pass").value;
 
-      function renderCarrito() {
-        const tbody = document.querySelector('#carrito-table tbody');
-        tbody.innerHTML = '';
-        let total = 0;
-        carrito.forEach((item, idx) => {
-          const sub = item.cantidad * item.precio;
-          total += sub;
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${item.codigo}</td>
-            <td>${item.nombre}</td>
-            <td><input type="number" min="1" value="${item.cantidad}" 
-                   onchange="cambiarCantidad(${idx}, this.value)"></td>
-            <td>${item.precio.toFixed(2)}</td>
-            <td>${sub.toFixed(2)}</td>
-            <td><button onclick="eliminarItem(${idx})">X</button></td>
-          `;
-          tbody.appendChild(tr);
-        });
-        document.getElementById('total-label').textContent = total.toFixed(2);
-      }
+  const res = await fetch(API + "?action=login&usuario=" + usuario + "&password=" + password);
+  const data = await res.json();
 
-      function confirmarVenta() {
-        if (!empleadoActual) return;
-        if (carrito.length === 0) {
-          alert('No hay productos en el carrito');
-          return;
-        }
-        google.script.run.withSuccessHandler(res => {
-          if (res.ok) {
-            alert('Venta registrada');
-            carrito = [];
-            renderCarrito();
-          } else {
-            alert('Error al registrar venta');
-          }
-        }).registrarVenta(carrito, empleadoActual);
-      }
+  if (data.ok) {
+    empleadoActual = data.nombre;
+    document.getElementById("empleado-label").textContent = data.nombre;
+    document.getElementById("login-view").classList.add("hidden");
+    document.getElementById("pos-view").classList.remove("hidden");
+  } else {
+    document.getElementById("login-msg").textContent = data.msg;
+  }
+}
 
-      // Ticket simple usando iframe
-      function imprimirTicket() {
-        if (carrito.length === 0) {
-          alert('No hay productos en el carrito');
-          return;
-        }
-        let html = '<html><head><title>Ticket</title></head><body>';
-        html += '<h3>Ticket de compra</h3>';
-        html += '<p>Empleado: ' + (empleadoActual || '') + '</p>';
-        html += '<table border="1" cellspacing="0" cellpadding="3">';
-        html += '<tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr>';
-        let total = 0;
-        carrito.forEach(item => {
-          const sub = item.cantidad * item.precio;
-          total += sub;
-          html += `<tr>
-            <td>${item.nombre}</td>
-            <td>${item.cantidad}</td>
-            <td>${item.precio.toFixed(2)}</td>
-            <td>${sub.toFixed(2)}</td>
-          </tr>`;
-        });
-        html += `<tr><td colspan="3"><b>Total</b></td><td><b>${total.toFixed(2)}</b></td></tr>`;
-        html += '</table>';
-        html += '<p>Gracias por su compra</p>';
-        html += '</body></html>';
+function logout() {
+  empleadoActual = null;
+  carrito = [];
+  renderCarrito();
+  document.getElementById("pos-view").classList.add("hidden");
+  document.getElementById("login-view").classList.remove("hidden");
+}
 
-        const iframe = document.getElementById('ticket-frame');
-        iframe.classList.remove('hidden');
-        const doc = iframe.contentWindow.document;
-        doc.open();
-        doc.write(html);
-        doc.close();
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-      }
+/* ---------------- BUSCAR PRODUCTO ---------------- */
+async function buscarCodigo(codeManual) {
+  const input = document.getElementById("codigo-input");
+  const codigo = codeManual || input.value.trim();
+  if (!codigo) return;
 
-      // Descargar ventas como Excel
-      function descargarVentas() {
-        google.script.run.withSuccessHandler(b64 => {
-          const byteChars = atob(b64);
-          const byteNumbers = new Array(byteChars.length);
-          for (let i = 0; i < byteChars.length; i++) {
-            byteNumbers[i] = byteChars.charCodeAt(i);
-          }
-          const byteArray = new Uint8Array(byteNumbers);
-          const blob = new Blob([byteArray], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'ventas.xlsx';
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }).exportarVentas();
-      }
+  const res = await fetch(API + "?action=buscar&codigo=" + codigo);
+  const data = await res.json();
 
-      // Cámara con Quagga
-      function toggleCam() {
-        const area = document.getElementById('scanner-area');
-        if (!camActiva) {
-          area.classList.remove('hidden');
-          startQuagga();
-        } else {
-          stopQuagga();
-          area.classList.add('hidden');
-        }
-        camActiva = !camActiva;
-      }
-    </script>
-  </body>
+  if (data.ok) {
+    agregarAlCarrito(data);
+    document.getElementById("scan-msg").textContent = "Producto agregado: " + data.nombre;
+  } else {
+    document.getElementById("scan-msg").textContent = data.msg;
+  }
+
+  input.value = "";
+  input.focus();
+}
+
+/* ---------------- CARRITO ---------------- */
+function agregarAlCarrito(prod) {
+  const existe = carrito.find(i => i.codigo == prod.codigo);
+  if (existe) {
+    existe.cantidad++;
+  } else {
+    carrito.push({
+      codigo: prod.codigo,
+      nombre: prod.nombre,
+      precio: Number(prod.precio),
+      cantidad: 1
+    });
+  }
+  renderCarrito();
+}
+
+function cambiarCantidad(i, val) {
+  const cant = Number(val);
+  if (cant <= 0) carrito.splice(i, 1);
+  else carrito[i].cantidad = cant;
+  renderCarrito();
+}
+
+function eliminarItem(i) {
+  carrito.splice(i, 1);
+  renderCarrito();
+}
+
+function renderCarrito() {
+  const tbody = document.getElementById("carrito-body");
+  tbody.innerHTML = "";
+  let total = 0;
+
+  carrito.forEach((item, i) => {
+    const sub = item.cantidad * item.precio;
+    total += sub;
+
+    tbody.innerHTML += `
+      <tr>
+        <td>${item.codigo}</td>
+        <td>${item.nombre}</td>
+        <td><input type="number" min="1" value="${item.cantidad}" onchange="cambiarCantidad(${i}, this.value)"></td>
+        <td>${item.precio.toFixed(2)}</td>
+        <td>${sub.toFixed(2)}</td>
+        <td><button onclick="eliminarItem(${i})">X</button></td>
+      </tr>
+    `;
+  });
+
+  document.getElementById("total-label").textContent = total.toFixed(2);
+}
+
+/* ---------------- CONFIRMAR VENTA ---------------- */
+async function confirmarVenta() {
+  if (!empleadoActual) return alert("No hay empleado logueado");
+  if (carrito.length === 0) return alert("Carrito vacío");
+
+  const res = await fetch(API, {
+    method: "POST",
+    body: JSON.stringify({
+      action: "venta",
+      empleado: empleadoActual,
+      carrito: carrito
+    })
+  });
+
+  const data = await res.json();
+
+  if (data.ok) {
+    alert("Venta registrada");
+    carrito = [];
+    renderCarrito();
+  } else {
+    alert("Error al registrar venta");
+  }
+}
+
+/* ---------------- TICKET ---------------- */
+function imprimirTicket() {
+  if (carrito.length === 0) return alert("Carrito vacío");
+
+  let html = "<html><body><h3>Ticket</h3>";
+  html += "<p>Empleado: " + empleadoActual + "</p>";
+  html += "<table border='1' cellspacing='0' cellpadding='4'>";
+  html += "<tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr>";
+
+  let total = 0;
+  carrito.forEach(item => {
+    const sub = item.cantidad * item.precio;
+    total += sub;
+    html += `<tr>
+      <td>${item.nombre}</td>
+      <td>${item.cantidad}</td>
+      <td>${item.precio.toFixed(2)}</td>
+      <td>${sub.toFixed(2)}</td>
+    </tr>`;
+  });
+
+  html += `<tr><td colspan="3"><b>Total</b></td><td><b>${total.toFixed(2)}</b></td></tr>`;
+  html += "</table></body></html>";
+
+  const frame = document.getElementById("ticket-frame");
+  frame.classList.remove("hidden");
+  const doc = frame.contentWindow.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
+  frame.contentWindow.print();
+}
+
+/* ---------------- DESCARGAR VENTAS ---------------- */
+async function descargarVentas() {
+  const res = await fetch(API + "?action=exportar");
+  const b64 = await res.text();
+
+  const byteChars = atob(b64);
+  const byteNumbers = Array.from(byteChars, c => c.charCodeAt(0));
+  const blob = new Blob([new Uint8Array(byteNumbers)], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  });
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "ventas.xlsx";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ---------------- CÁMARA (QUAGGA) ---------------- */
+function toggleCam() {
+  const area = document.getElementById("scanner-area");
+  if (!camActiva) {
+    area.classList.remove("hidden");
+    startQuagga();
+  } else {
+    stopQuagga();
+    area.classList.add("hidden");
+  }
+  camActiva = !camActiva;
+}
+
+function startQuagga() {
+  Quagga.init({
+    inputStream: {
+      type: "LiveStream",
+      target: document.querySelector("#scanner-area"),
+      constraints: { facingMode: "environment" }
+    },
+    decoder: { readers: ["ean_reader", "code_128_reader", "upc_reader"] }
+  }, err => {
+    if (err) return console.log(err);
+    Quagga.start();
+  });
+
+  Quagga.onDetected(res => {
+    const code = res.codeResult.code;
+    buscarCodigo(code);
+  });
+}
+
+function stopQuagga() {
+  try { Quagga.stop(); } catch(e){}
+}
+</script>
+
+</body>
 </html>
