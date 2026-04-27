@@ -236,9 +236,10 @@ let scanning = false;
 
 /* LOGIN */
 window.doLogin = async function () {
-    const usuario = user.value.trim();
-    const password = pass.value.trim();
-    loginMsg.textContent = "";
+    const usuario = document.getElementById("user").value.trim();
+    const password = document.getElementById("pass").value.trim();
+
+    document.getElementById("login-msg").textContent = "";
 
     const q = query(
         collection(db, "empleados"),
@@ -249,23 +250,23 @@ window.doLogin = async function () {
     const snap = await getDocs(q);
 
     if (snap.empty) {
-        loginMsg.textContent = "Usuario o contraseña incorrectos.";
+        document.getElementById("login-msg").textContent = "Usuario o contraseña incorrectos.";
         return;
     }
 
     empleadoActual = snap.docs[0].data().nombre;
-    empleadoLabel.textContent = empleadoActual;
+    document.getElementById("empleado-label").textContent = empleadoActual;
 
-    loginView.classList.add("hidden");
-    posView.classList.remove("hidden");
+    document.getElementById("login-view").classList.add("hidden");
+    document.getElementById("pos-view").classList.remove("hidden");
 
     cargarCategorias();
 };
 
 /* BUSCAR PRODUCTO */
 window.buscarCodigo = async function (manualCode) {
-    const codigo = (manualCode || codigoInput.value).trim();
-    scanMsg.textContent = "";
+    const codigo = (manualCode || document.getElementById("codigo-input").value).trim();
+    document.getElementById("scan-msg").textContent = "";
 
     if (!codigo) return;
 
@@ -278,28 +279,28 @@ window.buscarCodigo = async function (manualCode) {
     const snap = await getDocs(q);
 
     if (snap.empty) {
-        scanMsg.textContent = "Producto no encontrado. Podés agregarlo.";
-        altaContainer.classList.remove("hidden");
-        altaCodigo.value = codigo;
+        document.getElementById("scan-msg").textContent = "Producto no encontrado. Podés agregarlo.";
+        document.getElementById("alta-container").classList.remove("hidden");
+        document.getElementById("alta-codigo").value = codigo;
         return;
     }
 
     const prod = snap.docs[0].data();
     agregarAlCarrito(prod);
 
-    scanMsg.textContent = "Producto agregado: " + prod.nombre;
+    document.getElementById("scan-msg").textContent = "Producto agregado: " + prod.nombre;
 
-    codigoInput.value = "";
-    codigoInput.focus();
+    document.getElementById("codigo-input").value = "";
+    document.getElementById("codigo-input").focus();
 };
 
 /* ALTA PRODUCTO */
 window.guardarProducto = async function () {
-    const codigo = altaCodigo.value.trim();
-    const nombre = altaNombre.value.trim();
-    const precio = Number(altaPrecio.value);
-    const stock = Number(altaStock.value);
-    const categoria = altaCategoria.value;
+    const codigo = document.getElementById("alta-codigo").value.trim();
+    const nombre = document.getElementById("alta-nombre").value.trim();
+    const precio = Number(document.getElementById("alta-precio").value);
+    const stock = Number(document.getElementById("alta-stock").value);
+    const categoria = document.getElementById("alta-categoria").value;
 
     if (!codigo || !nombre || !precio || !stock || !categoria) {
         alert("Completá todos los campos.");
@@ -315,34 +316,36 @@ window.guardarProducto = async function () {
 };
 
 window.cerrarAltaProducto = function () {
-    altaContainer.classList.add("hidden");
-    altaNombre.value = "";
-    altaPrecio.value = "";
-    altaStock.value = "";
+    document.getElementById("alta-container").classList.add("hidden");
+    document.getElementById("alta-nombre").value = "";
+    document.getElementById("alta-precio").value = "";
+    document.getElementById("alta-stock").value = "";
 };
 
 /* CATEGORÍAS */
 async function cargarCategorias() {
     const snap = await getDocs(collection(db, "categorias"));
-    altaCategoria.innerHTML = '<option value="">Seleccionar...</option>';
+    const sel = document.getElementById("alta-categoria");
+
+    sel.innerHTML = '<option value="">Seleccionar...</option>';
 
     snap.forEach(doc => {
         const c = doc.data();
-        altaCategoria.innerHTML += `<option value="${c.nombre}">${c.nombre}</option>`;
+        sel.innerHTML += `<option value="${c.nombre}">${c.nombre}</option>`;
     });
 }
 
 window.abrirAltaCategoria = function () {
-    altaCategoriaCard.classList.remove("hidden");
+    document.getElementById("alta-categoria-card").classList.remove("hidden");
 };
 
 window.cerrarAltaCategoria = function () {
-    altaCategoriaCard.classList.add("hidden");
-    categoriaNombre.value = "";
+    document.getElementById("alta-categoria-card").classList.add("hidden");
+    document.getElementById("categoria-nombre").value = "";
 };
 
 window.guardarCategoria = async function () {
-    const nombre = categoriaNombre.value.trim();
+    const nombre = document.getElementById("categoria-nombre").value.trim();
     if (!nombre) return alert("Ingresá un nombre.");
 
     await addDoc(collection(db, "categorias"), { nombre });
@@ -363,7 +366,8 @@ function agregarAlCarrito(prod) {
 }
 
 function renderCarrito() {
-    carritoBody.innerHTML = "";
+    const tbody = document.getElementById("carrito-body");
+    tbody.innerHTML = "";
     let total = 0;
 
     carrito.forEach((item, i) => {
@@ -391,10 +395,10 @@ function renderCarrito() {
             renderCarrito();
         };
 
-        carritoBody.appendChild(tr);
+        tbody.appendChild(tr);
     });
 
-    totalLabel.textContent = total.toFixed(2);
+    document.getElementById("total-label").textContent = total.toFixed(2);
 }
 
 window.eliminarItem = function (i) {
@@ -418,11 +422,13 @@ window.exportarExcel = async function () {
 
 /* CÁMARA */
 window.toggleCam = function () {
-    if (scannerArea.classList.contains("hidden")) {
-        scannerArea.classList.remove("hidden");
+    const area = document.getElementById("scanner-area");
+
+    if (area.classList.contains("hidden")) {
+        area.classList.remove("hidden");
         startQuagga();
     } else {
-        scannerArea.classList.add("hidden");
+        area.classList.add("hidden");
         try { Quagga.stop(); } catch(e) {}
     }
 };
@@ -433,7 +439,7 @@ function startQuagga() {
     Quagga.init({
         inputStream: {
             type: "LiveStream",
-            target: scannerArea,
+            target: document.getElementById("scanner-area"),
             constraints: { facingMode: "environment" }
         },
         decoder: {
@@ -458,7 +464,7 @@ function startQuagga() {
         const code = res.codeResult.code;
 
         try { Quagga.stop(); } catch(e) {}
-        scannerArea.classList.add("hidden");
+        document.getElementById("scanner-area").classList.add("hidden");
 
         buscarCodigo(code);
     });
@@ -467,4 +473,3 @@ function startQuagga() {
 
 </body>
 </html>
-
