@@ -1,89 +1,113 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
   <meta charset="UTF-8">
   <title>Caja POS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <style>
-    body { font-family: Arial; padding: 10px; }
+    body { font-family: Arial, sans-serif; padding: 10px; background:#f5f5f5; }
+    .card { background:#fff; padding:15px; border-radius:8px; max-width:700px; margin:10px auto; box-shadow:0 2px 6px rgba(0,0,0,.1); }
     .hidden { display:none; }
-    table { width:100%; border-collapse: collapse; }
-    th, td { border:1px solid #ccc; padding:6px; font-size:14px; }
-    input, button { padding:8px; margin:4px 0; }
-    #scanner-area { width:100%; height:260px; background:#000; margin-top:10px; }
+    input, button { padding:8px; margin:4px 0; font-size:14px; }
+    button { cursor:pointer; }
+    table { width:100%; border-collapse: collapse; margin-top:10px; background:#fff; }
+    th, td { border:1px solid #ddd; padding:6px; font-size:13px; text-align:left; }
+    th { background:#f0f0f0; }
+    #total-label { font-weight:bold; }
+    .right { text-align:right; }
   </style>
-
-  <?!= include('quagga'); ?>
 </head>
-
 <body>
 
-<!-- LOGIN -->
-<div id="login-view">
+<div class="card" id="login-view">
   <h2>Iniciar sesión</h2>
+  <label>Usuario</label><br>
   <input id="user" placeholder="Usuario"><br>
+  <label>Contraseña</label><br>
   <input id="pass" type="password" placeholder="Contraseña"><br>
   <button onclick="doLogin()">Ingresar</button>
-  <div id="login-msg" style="color:red;"></div>
+  <div id="login-msg" style="color:red;margin-top:6px;"></div>
 </div>
 
-<!-- CAJA -->
-<div id="pos-view" class="hidden">
-  <h3>Caja POS</h3>
-  Empleado: <span id="empleado-label"></span>
-  <button onclick="logout()" style="float:right;">Salir</button>
+<div class="card hidden" id="pos-view">
+  <div style="display:flex;justify-content:space-between;align-items:center;">
+    <h3>Caja POS</h3>
+    <button onclick="logout()">Salir</button>
+  </div>
+  <p>Empleado: <strong id="empleado-label"></strong></p>
   <hr>
 
-  <h4>Escaneo</h4>
-  <input id="codigo-input" placeholder="Escaneá con pistola" autofocus onkeydown="if(event.key==='Enter') buscarCodigo()">
+  <h4>Escaneo / carga de producto</h4>
+  <input id="codigo-input"
+         placeholder="Escaneá con la pistola o escribí el código"
+         autofocus
+         onkeydown="if(event.key==='Enter') buscarCodigo()">
   <button onclick="buscarCodigo()">Agregar</button>
-  <button onclick="toggleCam()">Usar cámara</button>
-
-  <div id="scanner-area" class="hidden"></div>
-  <div id="scan-msg" style="color:green;"></div>
+  <div id="scan-msg" style="color:green;margin-top:4px;"></div>
 
   <h4>Carrito</h4>
   <table>
     <thead>
       <tr>
-        <th>Código</th><th>Nombre</th><th>Cant.</th><th>Precio</th><th>Subtotal</th><th></th>
+        <th>Código</th>
+        <th>Nombre</th>
+        <th>Cant.</th>
+        <th>Precio</th>
+        <th>Subtotal</th>
+        <th></th>
       </tr>
     </thead>
     <tbody id="carrito-body"></tbody>
   </table>
 
-  <div style="text-align:right;margin-top:10px;">
+  <div class="right" style="margin-top:8px;">
     Total: $<span id="total-label">0.00</span>
   </div>
 
-  <button onclick="confirmarVenta()">Confirmar venta</button>
-  <button onclick="imprimirTicket()">Imprimir ticket</button>
-  <button onclick="descargarVentas()">Descargar ventas</button>
+  <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+    <button onclick="confirmarVenta()">Confirmar venta</button>
+    <button onclick="imprimirTicket()">Imprimir ticket</button>
+  </div>
 
   <iframe id="ticket-frame" class="hidden"></iframe>
 </div>
 
 <script>
+// URL de tu WebApp de Apps Script
+const API = "https://script.google.com/macros/s/AKfycbzpWqLztewkXOcv8kVdjQZy7rhIgvoGxfzItPTVCXx_hdAI3Q6TpTYnRmn7FGj39eS_/exec";
+
 let empleadoActual = null;
 let carrito = [];
-let camActiva = false;
 
-/* ---------------- LOGIN ---------------- */
-function doLogin() {
-  const usuario = document.getElementById("user").value;
-  const password = document.getElementById("pass").value;
+/* ---------- LOGIN ---------- */
+async function doLogin() {
+  const usuario = document.getElementById("user").value.trim();
+  const password = document.getElementById("pass").value.trim();
+  const msg = document.getElementById("login-msg");
+  msg.textContent = "";
 
-  google.script.run.withSuccessHandler(res => {
-    if (res.ok) {
-      empleadoActual = res.nombre;
-      document.getElementById("empleado-label").textContent = res.nombre;
+  if (!usuario || !password) {
+    msg.textContent = "Completá usuario y contraseña.";
+    return;
+  }
+
+  try {
+    const url = `${API}?action=login&usuario=${encodeURIComponent(usuario)}&password=${encodeURIComponent(password)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.ok) {
+      empleadoActual = data.nombre;
+      document.getElementById("empleado-label").textContent = data.nombre;
       document.getElementById("login-view").classList.add("hidden");
       document.getElementById("pos-view").classList.remove("hidden");
     } else {
-      document.getElementById("login-msg").textContent = res.msg;
+      msg.textContent = data.msg || "Error de login.";
     }
-  }).login(usuario, password);
+  } catch (err) {
+    console.error(err);
+    msg.textContent = "No se pudo conectar al servidor.";
+  }
 }
 
 function logout() {
@@ -94,27 +118,38 @@ function logout() {
   document.getElementById("login-view").classList.remove("hidden");
 }
 
-/* ---------------- BUSCAR PRODUCTO ---------------- */
-function buscarCodigo(codeManual) {
+/* ---------- BUSCAR PRODUCTO ---------- */
+async function buscarCodigo(codeManual) {
   const input = document.getElementById("codigo-input");
-  const codigo = codeManual || input.value.trim();
+  const codigo = (codeManual || input.value).trim();
+  const scanMsg = document.getElementById("scan-msg");
+  scanMsg.textContent = "";
+
   if (!codigo) return;
 
-  google.script.run.withSuccessHandler(res => {
-    if (res.ok) {
-      agregarAlCarrito(res);
-      document.getElementById("scan-msg").textContent = "Producto agregado: " + res.nombre;
+  try {
+    const url = `${API}?action=buscar&codigo=${encodeURIComponent(codigo)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.ok) {
+      agregarAlCarrito(data);
+      scanMsg.textContent = "Producto agregado: " + data.nombre;
     } else {
-      document.getElementById("scan-msg").textContent = res.msg;
+      scanMsg.textContent = data.msg || "Producto no encontrado.";
     }
-    input.value = "";
-    input.focus();
-  }).buscarProductoPorCodigo(codigo);
+  } catch (err) {
+    console.error(err);
+    scanMsg.textContent = "Error al buscar producto.";
+  }
+
+  input.value = "";
+  input.focus();
 }
 
-/* ---------------- CARRITO ---------------- */
+/* ---------- CARRITO ---------- */
 function agregarAlCarrito(prod) {
-  const existe = carrito.find(i => i.codigo == prod.codigo);
+  const existe = carrito.find(i => String(i.codigo) === String(prod.codigo));
   if (existe) {
     existe.cantidad++;
   } else {
@@ -130,8 +165,11 @@ function agregarAlCarrito(prod) {
 
 function cambiarCantidad(i, val) {
   const cant = Number(val);
-  if (cant <= 0) carrito.splice(i, 1);
-  else carrito[i].cantidad = cant;
+  if (cant <= 0 || isNaN(cant)) {
+    carrito.splice(i, 1);
+  } else {
+    carrito[i].cantidad = cant;
+  }
   renderCarrito();
 }
 
@@ -149,43 +187,70 @@ function renderCarrito() {
     const sub = item.cantidad * item.precio;
     total += sub;
 
-    tbody.innerHTML += `
-      <tr>
-        <td>${item.codigo}</td>
-        <td>${item.nombre}</td>
-        <td><input type="number" min="1" value="${item.cantidad}" onchange="cambiarCantidad(${i}, this.value)"></td>
-        <td>${item.precio.toFixed(2)}</td>
-        <td>${sub.toFixed(2)}</td>
-        <td><button onclick="eliminarItem(${i})">X</button></td>
-      </tr>
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${item.codigo}</td>
+      <td>${item.nombre}</td>
+      <td><input type="number" min="1" value="${item.cantidad}" style="width:60px;"></td>
+      <td>${item.precio.toFixed(2)}</td>
+      <td>${sub.toFixed(2)}</td>
+      <td><button>X</button></td>
     `;
+
+    tr.querySelector("input").onchange = (e) => cambiarCantidad(i, e.target.value);
+    tr.querySelector("button").onclick = () => eliminarItem(i);
+
+    tbody.appendChild(tr);
   });
 
   document.getElementById("total-label").textContent = total.toFixed(2);
 }
 
-/* ---------------- CONFIRMAR VENTA ---------------- */
-function confirmarVenta() {
-  if (!empleadoActual) return alert("No hay empleado logueado");
-  if (carrito.length === 0) return alert("Carrito vacío");
+/* ---------- CONFIRMAR VENTA ---------- */
+async function confirmarVenta() {
+  if (!empleadoActual) {
+    alert("No hay empleado logueado.");
+    return;
+  }
+  if (carrito.length === 0) {
+    alert("Carrito vacío.");
+    return;
+  }
 
-  google.script.run.withSuccessHandler(res => {
-    if (res.ok) {
-      alert("Venta registrada");
+  try {
+    const res = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "venta",
+        empleado: empleadoActual,
+        carrito: carrito
+      })
+    });
+
+    const data = await res.json();
+    if (data.ok) {
+      alert("Venta registrada correctamente.");
       carrito = [];
       renderCarrito();
     } else {
-      alert("Error al registrar venta");
+      alert(data.msg || "Error al registrar venta.");
     }
-  }).registrarVenta(carrito, empleadoActual);
+  } catch (err) {
+    console.error(err);
+    alert("No se pudo conectar al servidor.");
+  }
 }
 
-/* ---------------- TICKET ---------------- */
+/* ---------- TICKET ---------- */
 function imprimirTicket() {
-  if (carrito.length === 0) return alert("Carrito vacío");
+  if (carrito.length === 0) {
+    alert("Carrito vacío.");
+    return;
+  }
 
   let html = "<html><body><h3>Ticket</h3>";
-  html += "<p>Empleado: " + empleadoActual + "</p>";
+  html += "<p>Empleado: " + (empleadoActual || "") + "</p>";
   html += "<table border='1' cellspacing='0' cellpadding='4'>";
   html += "<tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr>";
 
@@ -211,37 +276,6 @@ function imprimirTicket() {
   doc.write(html);
   doc.close();
   frame.contentWindow.print();
-}
-
-/* ---------------- DESCARGAR VENTAS ---------------- */
-function descargarVentas() {
-  google.script.run.withSuccessHandler(b64 => {
-    const byteChars = atob(b64);
-    const byteNumbers = Array.from(byteChars, c => c.charCodeAt(0));
-    const blob = new Blob([new Uint8Array(byteNumbers)], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    });
-
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "ventas.xlsx";
-    a.click();
-    URL.revokeObjectURL(url);
-  }).exportarVentas();
-}
-
-/* ---------------- CÁMARA (QUAGGA) ---------------- */
-function toggleCam() {
-  const area = document.getElementById("scanner-area");
-  if (!camActiva) {
-    area.classList.remove("hidden");
-    startQuagga();
-  } else {
-    stopQuagga();
-    area.classList.add("hidden");
-  }
-  camActiva = !camActiva;
 }
 </script>
 
