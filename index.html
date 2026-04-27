@@ -1,186 +1,258 @@
 <!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Canocchi Control</title>
+<html>
+  <head>
+    <base target="_top">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      body { font-family: Arial, sans-serif; padding: 10px; }
+      .hidden { display:none; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border: 1px solid #ccc; padding: 4px; font-size: 13px; }
+      #scanner-area { width: 100%; max-height: 260px; background:#000; margin:8px 0; }
+      input, button { padding:6px; margin:3px 0; }
+    </style>
+    <?!= include('quagga'); ?>
+  </head>
+  <body>
+    <!-- LOGIN -->
+    <div id="login-view">
+      <h3>Login de empleado</h3>
+      <input id="user" placeholder="Usuario"><br>
+      <input id="pass" type="password" placeholder="Contraseña"><br>
+      <button onclick="doLogin()">Ingresar</button>
+      <div id="login-msg" style="color:red;"></div>
+    </div>
 
-<style>
-body {
-  font-family: Arial;
-  padding: 20px;
-}
+    <!-- CAJA -->
+    <div id="pos-view" class="hidden">
+      <div>
+        Empleado: <span id="empleado-label"></span>
+        <button onclick="logout()" style="float:right;">Salir</button>
+      </div>
+      <hr>
 
-input, button {
-  padding: 10px;
-  margin: 5px;
-}
+      <!-- Escaneo -->
+      <h4>Escaneo</h4>
+      <label>Código (pistola o teclado):</label><br>
+      <input id="codigo-input" autofocus onkeydown="codigoKey(event)">
+      <button onclick="buscarCodigo()">Agregar</button>
+      <button onclick="toggleCam()">Usar cámara</button>
 
-#carrito {
-  margin-top: 20px;
-}
-</style>
-</head>
+      <div id="scanner-area" class="hidden"></div>
+      <div id="scan-msg" style="color:green;"></div>
 
-<body>
+      <!-- Carrito -->
+      <h4>Carrito</h4>
+      <table id="carrito-table">
+        <thead>
+          <tr>
+            <th>Código</th><th>Nombre</th><th>Cant.</th><th>Precio</th><th>Subtotal</th><th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div style="text-align:right;margin-top:5px;">
+        Total: $<span id="total-label">0.00</span>
+      </div>
 
-<h2>Canocchi Control</h2>
+      <button onclick="confirmarVenta()">Confirmar venta</button>
+      <button onclick="imprimirTicket()">Imprimir ticket</button>
+      <button onclick="descargarVentas()">Descargar ventas (Excel)</button>
 
-<h3>Agregar producto</h3>
-<input id="nombre" placeholder="Nombre">
-<input id="precio" type="number" placeholder="Precio">
-<input id="cantidad" type="number" placeholder="Cantidad">
-<input id="codigo" placeholder="Código de barras">
-<button onclick="agregarProducto()">Guardar</button>
+      <iframe id="ticket-frame" class="hidden"></iframe>
+    </div>
 
-<hr>
+    <script>
+      let empleadoActual = null;
+      let carrito = [];
+      let camActiva = false;
 
-<h3>Venta</h3>
-<input id="scanner" placeholder="Escanear código" autofocus>
+      function doLogin() {
+        const u = document.getElementById('user').value.trim();
+        const p = document.getElementById('pass').value.trim();
+        google.script.run.withSuccessHandler(res => {
+          if (res.ok) {
+            empleadoActual = res.nombre;
+            document.getElementById('empleado-label').textContent = res.nombre;
+            document.getElementById('login-view').classList.add('hidden');
+            document.getElementById('pos-view').classList.remove('hidden');
+            document.getElementById('login-msg').textContent = '';
+            document.getElementById('codigo-input').focus();
+          } else {
+            document.getElementById('login-msg').textContent = res.msg;
+          }
+        }).login(u, p);
+      }
 
-<div id="carrito"></div>
+      function logout() {
+        empleadoActual = null;
+        carrito = [];
+        renderCarrito();
+        document.getElementById('pos-view').classList.add('hidden');
+        document.getElementById('login-view').classList.remove('hidden');
+      }
 
-<button onclick="confirmarVenta()">Confirmar venta</button>
+      function codigoKey(e) {
+        if (e.key === 'Enter') {
+          buscarCodigo();
+        }
+      }
 
-<h3 id="resumen"></h3>
+      function buscarCodigo(codigoManual) {
+        const input = document.getElementById('codigo-input');
+        const codigo = (codigoManual || input.value).trim();
+        if (!codigo) return;
+        google.script.run.withSuccessHandler(res => {
+          if (res.ok) {
+            agregarAlCarrito(res);
+            document.getElementById('scan-msg').textContent = 'Producto agregado: ' + res.nombre;
+          } else {
+            document.getElementById('scan-msg').textContent = res.msg;
+          }
+          input.value = '';
+          input.focus();
+        }).buscarProductoPorCodigo(codigo);
+      }
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+      function agregarAlCarrito(prod) {
+        const existente = carrito.find(i => i.codigo == prod.codigo);
+        if (existente) {
+          existente.cantidad += 1;
+        } else {
+          carrito.push({
+            codigo: prod.codigo,
+            nombre: prod.nombre,
+            precio: Number(prod.precio),
+            cantidad: 1
+          });
+        }
+        renderCarrito();
+      }
 
-// 🔥 TU CONFIG (ya incluida)
-const firebaseConfig = {
-  apiKey: "AIzaSyDSKVd4-PMXxupXvil7Hbfpt6EZbOKef4o",
-  authDomain: "control-dee-stock-canocchi.firebaseapp.com",
-  projectId: "control-dee-stock-canocchi",
-  storageBucket: "control-dee-stock-canocchi.firebasestorage.app",
-  messagingSenderId: "100048512779",
-  appId: "1:100048512779:web:bc5bbcb7134a8758aca40e"
-};
+      function cambiarCantidad(idx, valor) {
+        const cant = Number(valor);
+        if (cant <= 0 || isNaN(cant)) {
+          carrito.splice(idx, 1);
+        } else {
+          carrito[idx].cantidad = cant;
+        }
+        renderCarrito();
+      }
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+      function eliminarItem(idx) {
+        carrito.splice(idx, 1);
+        renderCarrito();
+      }
 
-console.log("🔥 Firebase conectado");
+      function renderCarrito() {
+        const tbody = document.querySelector('#carrito-table tbody');
+        tbody.innerHTML = '';
+        let total = 0;
+        carrito.forEach((item, idx) => {
+          const sub = item.cantidad * item.precio;
+          total += sub;
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${item.codigo}</td>
+            <td>${item.nombre}</td>
+            <td><input type="number" min="1" value="${item.cantidad}" 
+                   onchange="cambiarCantidad(${idx}, this.value)"></td>
+            <td>${item.precio.toFixed(2)}</td>
+            <td>${sub.toFixed(2)}</td>
+            <td><button onclick="eliminarItem(${idx})">X</button></td>
+          `;
+          tbody.appendChild(tr);
+        });
+        document.getElementById('total-label').textContent = total.toFixed(2);
+      }
 
-let productos = [];
-let carrito = [];
+      function confirmarVenta() {
+        if (!empleadoActual) return;
+        if (carrito.length === 0) {
+          alert('No hay productos en el carrito');
+          return;
+        }
+        google.script.run.withSuccessHandler(res => {
+          if (res.ok) {
+            alert('Venta registrada');
+            carrito = [];
+            renderCarrito();
+          } else {
+            alert('Error al registrar venta');
+          }
+        }).registrarVenta(carrito, empleadoActual);
+      }
 
-// 📦 Cargar productos
-async function cargarProductos() {
-  const snapshot = await getDocs(collection(db, "productos"));
-  productos = [];
-  snapshot.forEach(docu => {
-    productos.push({ id: docu.id, ...docu.data() });
-  });
-}
+      // Ticket simple usando iframe
+      function imprimirTicket() {
+        if (carrito.length === 0) {
+          alert('No hay productos en el carrito');
+          return;
+        }
+        let html = '<html><head><title>Ticket</title></head><body>';
+        html += '<h3>Ticket de compra</h3>';
+        html += '<p>Empleado: ' + (empleadoActual || '') + '</p>';
+        html += '<table border="1" cellspacing="0" cellpadding="3">';
+        html += '<tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr>';
+        let total = 0;
+        carrito.forEach(item => {
+          const sub = item.cantidad * item.precio;
+          total += sub;
+          html += `<tr>
+            <td>${item.nombre}</td>
+            <td>${item.cantidad}</td>
+            <td>${item.precio.toFixed(2)}</td>
+            <td>${sub.toFixed(2)}</td>
+          </tr>`;
+        });
+        html += `<tr><td colspan="3"><b>Total</b></td><td><b>${total.toFixed(2)}</b></td></tr>`;
+        html += '</table>';
+        html += '<p>Gracias por su compra</p>';
+        html += '</body></html>';
 
-// ➕ Agregar producto
-window.agregarProducto = async function() {
-  let nombre = document.getElementById("nombre").value;
-  let precio = parseFloat(document.getElementById("precio").value);
-  let cantidad = parseInt(document.getElementById("cantidad").value);
-  let codigo = document.getElementById("codigo").value;
+        const iframe = document.getElementById('ticket-frame');
+        iframe.classList.remove('hidden');
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(html);
+        doc.close();
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      }
 
-  if (!nombre || !precio || !cantidad || !codigo) {
-    alert("Completá todos los campos");
-    return;
-  }
+      // Descargar ventas como Excel
+      function descargarVentas() {
+        google.script.run.withSuccessHandler(b64 => {
+          const byteChars = atob(b64);
+          const byteNumbers = new Array(byteChars.length);
+          for (let i = 0; i < byteChars.length; i++) {
+            byteNumbers[i] = byteChars.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'ventas.xlsx';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }).exportarVentas();
+      }
 
-  await addDoc(collection(db, "productos"), {
-    nombre, precio, cantidad, codigo
-  });
-
-  alert("Producto guardado");
-  cargarProductos();
-};
-
-// 🔫 Escáner
-document.getElementById("scanner").addEventListener("change", function() {
-  let codigo = this.value;
-
-  let producto = productos.find(p => p.codigo == codigo);
-
-  if (producto && producto.cantidad > 0) {
-    carrito.push(producto);
-    renderCarrito();
-  } else {
-    alert("No hay stock o no existe");
-  }
-
-  this.value = "";
-});
-
-// 🛒 Mostrar carrito
-function renderCarrito() {
-  let html = "";
-  let total = 0;
-
-  carrito.forEach(p => {
-    html += <p>${p.nombre} - $${p.precio}</p>;
-    total += p.precio;
-  });
-
-  html += <strong>Total: $${total}</strong>;
-
-  document.getElementById("carrito").innerHTML = html;
-}
-
-// 💸 Confirmar venta
-window.confirmarVenta = async function() {
-  if (carrito.length === 0) {
-    alert("No hay productos");
-    return;
-  }
-
-  let fecha = new Date();
-  let total = 0;
-
-  for (let item of carrito) {
-    total += item.precio;
-
-    await updateDoc(doc(db, "productos", item.id), {
-      cantidad: item.cantidad - 1
-    });
-  }
-
-  await addDoc(collection(db, "ventas"), {
-    fecha: fecha.toLocaleDateString(),
-    hora: fecha.toLocaleTimeString(),
-    items: carrito,
-    total
-  });
-
-  carrito = [];
-  await cargarProductos();
-  renderCarrito();
-  resumenHoy();
-};
-
-// 📊 Resumen
-async function resumenHoy() {
-  const snapshot = await getDocs(collection(db, "ventas"));
-
-  let hoy = new Date().toLocaleDateString();
-  let total = 0;
-  let cantidad = 0;
-
-  snapshot.forEach(docu => {
-    let v = docu.data();
-    if (v.fecha === hoy) {
-      total += v.total;
-      cantidad += v.items.length;
-    }
-  });
-
-  document.getElementById("resumen").innerText =
-    Hoy vendiste ${cantidad} productos — $${total};
-}
-
-// INIT
-cargarProductos();
-resumenHoy();
-
-</script>
-
-</body>
+      // Cámara con Quagga
+      function toggleCam() {
+        const area = document.getElementById('scanner-area');
+        if (!camActiva) {
+          area.classList.remove('hidden');
+          startQuagga();
+        } else {
+          stopQuagga();
+          area.classList.add('hidden');
+        }
+        camActiva = !camActiva;
+      }
+    </script>
+  </body>
 </html>
