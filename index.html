@@ -89,19 +89,28 @@ let empleadoActual=null;
 let scanning=false;
 
 /* LOGIN /
-window.doLogin = async ()=>{
-const u=user.value;
-const p=pass.value;
+window.doLogin = async () => {
+    const u = document.getElementById("user").value;
+    const p = document.getElementById("pass").value;
 
-const q=query(collection(db,"empleados"),where("usuario","==",u),where("password","==",p));
-const s=await getDocs(q);
+    const q = query(
+        collection(db,"empleados"),
+        where("usuario","==",u),
+        where("password","==",p)
+    );
 
-if(s.empty){login-msg.textContent="Error login";return;}
+    const s = await getDocs(q);
 
-empleadoActual=u;
-login-view.classList.add("hidden");
-pos-view.classList.remove("hidden");
-empleado-label.textContent=u;
+    if (s.empty) {
+        document.getElementById("login-msg").textContent = "Error login";
+        return;
+    }
+
+    empleadoActual = u;
+
+    document.getElementById("login-view").classList.add("hidden");
+    document.getElementById("pos-view").classList.remove("hidden");
+    document.getElementById("empleado-label").textContent = u;
 };
 
 / LOGOUT /
