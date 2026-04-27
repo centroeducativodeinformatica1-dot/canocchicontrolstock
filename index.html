@@ -11,7 +11,7 @@ body{font-family:Arial;background:#f5f5f5;margin:0;}
 #login-view{text-align:center;margin-top:60px;}
 #login-view img{width:170px;margin-bottom:20px;}
 input{width:100%;padding:10px;margin:6px 0;border-radius:6px;border:1px solid #ccc;}
-.btn{padding:10px;border:none;border-radius:6px;cursor:pointer;}
+button{padding:10px;border:none;border-radius:6px;cursor:pointer;}
 .btn-rojo{background:#E53935;color:#fff;}
 .card{background:#fff;padding:15px;border-radius:8px;max-width:900px;margin:15px auto;}
 table{width:100%;border-collapse:collapse;}
@@ -26,7 +26,7 @@ td,th{border:1px solid #ccc;padding:6px;}
 <img src="CanocchiLogo.PNG">
 <input id="user" placeholder="Usuario">
 <input id="pass" type="password" placeholder="Contraseña">
-<button class="btn btn-rojo" id="btnLogin">Ingresar</button>
+<button class="btn-rojo" id="btnLogin">Ingresar</button>
 <div id="login-msg" style="color:red;"></div>
 </div>
 
@@ -37,7 +37,7 @@ td,th{border:1px solid #ccc;padding:6px;}
 <h2>Canocchi POS</h2>
 <div>
 <span id="empleado-label"></span>
-<button class="btn btn-rojo" id="logoutBtn">Salir</button>
+<button class="btn-rojo" id="logoutBtn">Salir</button>
 </div>
 </div>
 
@@ -100,7 +100,6 @@ document.getElementById("login-msg").textContent = "Usuario o contraseña incorr
 return;
 }
 
-// LOGIN OK
 empleado = u;
 
 document.getElementById("login-view").classList.add("hidden");
@@ -114,14 +113,14 @@ document.getElementById("logoutBtn").addEventListener("click", ()=>{
 location.reload();
 });
 
-// AGREGAR PRODUCTO (DEMO SIMPLE)
+// DEMO: agregar producto al presionar Enter
 document.getElementById("codigo-input").addEventListener("keydown", e=>{
 if(e.key === "Enter"){
-agregarProductoDemo();
+agregarProducto();
 }
 });
 
-function agregarProductoDemo(){
+function agregarProducto(){
 
 const producto = {
 nombre: "Producto demo",
@@ -130,6 +129,7 @@ precio: 1000
 
 carrito.push(producto);
 render();
+
 }
 
 // RENDER
@@ -143,9 +143,9 @@ carrito.forEach((item, index)=>{
 
 total += item.precio;
 
-const row = <tr> <td>${item.nombre}</td> <td>${item.precio}</td> <td><button onclick="eliminar(${index})">X</button></td> </tr>;
+const fila = <tr> <td>${item.nombre}</td> <td>${item.precio}</td> <td><button onclick="eliminarItem(${index})">X</button></td> </tr>;
 
-tbody.innerHTML += row;
+tbody.innerHTML += fila;
 
 });
 
@@ -154,7 +154,7 @@ document.getElementById("total").textContent = total;
 }
 
 // ELIMINAR
-window.eliminar = function(index){
+window.eliminarItem = function(index){
 carrito.splice(index,1);
 render();
 };
