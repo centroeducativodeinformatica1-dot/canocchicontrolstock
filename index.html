@@ -198,8 +198,8 @@ th { background: #eee; }
     <input id="categoria-nombre" placeholder="Nombre de la categoría">
     <button class="btn-rojo" onclick="guardarCategoria()">Guardar</button>
     <button class="btn-negro" onclick="cerrarAltaCategoria()">Cancelar</button>
-</div>
-<!-- FIREBASE + LÓGICA -->
+</div> 
+<!-- FIREBASE + LÓGICA ORIGINAL -->
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -229,9 +229,7 @@ let empleadoActual = null;
 let carrito = [];
 let scanning = false;
 
-/* ============================
-   LOGIN
-============================ */
+/* LOGIN */
 window.doLogin = async function () {
     const usuario = document.getElementById("user").value.trim();
     const password = document.getElementById("pass").value.trim();
@@ -260,9 +258,7 @@ window.doLogin = async function () {
     cargarCategorias();
 };
 
-/* ============================
-   BUSCAR PRODUCTO
-============================ */
+/* BUSCAR PRODUCTO */
 window.buscarCodigo = async function (manualCode) {
     const codigo = (manualCode || document.getElementById("codigo-input").value).trim();
     document.getElementById("scan-msg").textContent = "";
@@ -293,9 +289,7 @@ window.buscarCodigo = async function (manualCode) {
     document.getElementById("codigo-input").focus();
 };
 
-/* ============================
-   ALTA PRODUCTO
-============================ */
+/* ALTA PRODUCTO */
 window.guardarProducto = async function () {
     const codigo = document.getElementById("alta-codigo").value.trim();
     const nombre = document.getElementById("alta-nombre").value.trim();
@@ -323,9 +317,7 @@ window.cerrarAltaProducto = function () {
     document.getElementById("alta-stock").value = "";
 };
 
-/* ============================
-   CATEGORÍAS
-============================ */
+/* CATEGORÍAS */
 async function cargarCategorias() {
     const snap = await getDocs(collection(db, "categorias"));
     const sel = document.getElementById("alta-categoria");
@@ -358,9 +350,7 @@ window.guardarCategoria = async function () {
     cargarCategorias();
 };
 
-/* ============================
-   CARRITO
-============================ */
+/* CARRITO */
 function agregarAlCarrito(prod) {
     const existe = carrito.find(i => i.codigo == prod.codigo);
 
@@ -413,9 +403,7 @@ window.eliminarItem = function (i) {
     renderCarrito();
 };
 
-/* ============================
-   EXPORTAR EXCEL
-============================ */
+/* EXPORTAR EXCEL */
 window.exportarExcel = async function () {
     const snap = await getDocs(collection(db, "ventas"));
     const rows = [];
@@ -429,9 +417,7 @@ window.exportarExcel = async function () {
     XLSX.writeFile(wb, "ventas.xlsx");
 };
 
-/* ============================
-   CÁMARA + QUAGGA
-============================ */
+/* CÁMARA */
 window.toggleCam = function () {
     const area = document.getElementById("scanner-area");
 
@@ -468,208 +454,22 @@ function startQuagga() {
         Quagga.start();
     });
 
-    Quagga.onDetected(res => {
-        if (!scanning) return;
-        scanning = false;
+  Quagga.onDetected(res => {
+    if (!scanning) return;   // ← ESTA ES LA CONDICIÓN CORRECTA
+    scanning = false;
 
-        const code = res.codeResult.code;
+    const code = res.codeResult.code;
 
-        try { Quagga.stop(); } catch(e) {}
-        document.getElementById("scanner-area").classList.add("hidden");
+    try { Quagga.stop(); } catch(e) {}
 
-        buscarCodigo(code);
-    });
-}
-    /* ============================
-   PAGO
-============================ */
-window.abrirPago = function () {
-    if (carrito.length === 0) {
-        alert("No hay productos en el carrito.");
-        return;
-    }
+    document.getElementById("scanner-area").classList.add("hidden");
 
-    const total = Number(document.getElementById("total-label").textContent);
-
-    const metodo = prompt(
-        "Método de pago:\n1) Efectivo\n2) Tarjeta\n3) QR\n4) Transferencia"
-    );
-
-    if (!metodo) return;
-
-    if (metodo === "1") {
-        const entregado = Number(prompt("Monto entregado:"));
-        if (isNaN(entregado) || entregado < total) {
-            alert("Monto insuficiente.");
-            return;
-        }
-        const vuelto = entregado - total;
-        registrarVenta("Efectivo", vuelto);
-    }
-
-    if (metodo === "2") registrarVenta("Tarjeta");
-    if (metodo === "3") registrarVenta("QR");
-    if (metodo === "4") registrarVenta("Transferencia");
-};
-
-async function registrarVenta(metodo, vuelto = 0) {
-    const total = Number(document.getElementById("total-label").textContent);
-
-    const venta = {
-        fecha: Date.now(),
-        empleado: empleadoActual,
-        metodo,
-        total,
-        vuelto,
-        items: carrito
-    };
-
-    await addDoc(collection(db, "ventas"), venta);
-
-    mostrarTicket(venta);
-
-    carrito = [];
-    renderCarrito();
+    buscarCodigo(code);
+});
 }
 
-/* ============================
-   TICKET
-============================ */
-function mostrarTicket(v) {
-    let html = "TICKET\n\n";
-    html += "Empleado: " + v.empleado + "\n";
-    html += "Fecha: " + new Date(v.fecha).toLocaleString() + "\n";
-    html += "Método: " + v.metodo + "\n\n";
-
-    v.items.forEach(i => {
-        html += ${i.nombre} x${i.cantidad} = $${(i.cantidad * i.precio).toFixed(2)}\n;
-    });
-
-    html += \nTOTAL: $${v.total.toFixed(2)}\n;
-
-    if (v.vuelto) html += Vuelto: $${v.vuelto.toFixed(2)}\n;
-
-    alert(html);
-}
-
-/* ============================
-   DASHBOARD
-============================ */
-window.abrirDashboard = async function () {
-    const snap = await getDocs(collection(db, "ventas"));
-
-    let hoy = 0;
-    let mes = 0;
-    let contador = {};
-
-    const ahora = new Date();
-    const diaHoy = ahora.toLocaleDateString();
-    const mesActual = ahora.getMonth();
-
-    snap.forEach(doc => {
-        const v = doc.data();
-        const fecha = new Date(v.fecha);
-
-        if (fecha.toLocaleDateString() === diaHoy) hoy += v.total;
-        if (fecha.getMonth() === mesActual) mes += v.total;
-
-        v.items.forEach(i => {
-            if (!contador[i.nombre]) contador[i.nombre] = 0;
-            contador[i.nombre] += i.cantidad;
-        });
-    });
-
-    const top = Object.keys(contador).length
-        ? Object.entries(contador).sort((a, b) => b[1] - a[1])[0][0]
-        : "N/A";
-
-    alert(
-        "DASHBOARD\n\n" +
-        "Ventas hoy: $" + hoy.toFixed(2) + "\n" +
-        "Ventas mes: $" + mes.toFixed(2) + "\n" +
-        "Producto más vendido: " + top
-    );
-};
-
-/* ============================
-   HISTORIAL
-============================ */
-window.abrirHistorial = async function () {
-    const snap = await getDocs(collection(db, "ventas"));
-
-    let txt = "HISTORIAL DE VENTAS\n\n";
-
-    snap.forEach(doc => {
-        const v = doc.data();
-        txt += ${new Date(v.fecha).toLocaleString()} — ${v.metodo} — $${v.total.toFixed(2)}\n;
-    });
-
-    alert(txt);
-};
-
-/* ============================
-   CIERRE DE CAJA
-============================ */
-window.abrirCierreCaja = async function () {
-    const snap = await getDocs(collection(db, "ventas"));
-
-    let total = 0;
-    let cant = 0;
-    let tarjeta = 0;
-    let qr = 0;
-    let efectivo = 0;
-    let transferencia = 0;
-
-    snap.forEach(doc => {
-        const v = doc.data();
-        total += v.total;
-        cant++;
-
-        if (v.metodo === "Tarjeta") tarjeta += v.total;
-        if (v.metodo === "QR") qr += v.total;
-        if (v.metodo === "Efectivo") efectivo += v.total;
-        if (v.metodo === "Transferencia") transferencia += v.total;
-    });
-
-    alert(
-        "CIERRE DE CAJA\n\n" +
-        "Total vendido: $" + total.toFixed(2) + "\n" +
-        "Cantidad ventas: " + cant + "\n\n" +
-        "Tarjeta: $" + tarjeta.toFixed(2) + "\n" +
-        "QR: $" + qr.toFixed(2) + "\n" +
-        "Efectivo: $" + efectivo.toFixed(2) + "\n" +
-        "Transferencia: $" + transferencia.toFixed(2)
-    );
-};
-
-/* ============================
-   ADMIN
-============================ */
-window.abrirAdmin = function () {
-    alert(
-        "ADMINISTRACIÓN\n\n" +
-        "1) Exportar ventas\n" +
-        "2) Cierre de caja\n" +
-        "3) Dashboard\n" +
-        "4) Historial"
-    );
-};
-
-/* ============================
-   TEMA OSCURO
-============================ */
-window.toggleTema = function () {
-    document.body.style.background =
-        document.body.style.background === "black" ? "#f5f5f5" : "black";
-
-    document.body.style.color =
-        document.body.style.color === "white" ? "black" : "white";
-};
-
-/* ============================
-   FIN DEL SCRIPT
-============================ */
-</script>
+</script> 
+    </script>
 
 </body>
 </html>
