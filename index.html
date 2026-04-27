@@ -2,19 +2,20 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Canocchi POS PRO</title>
+<title>Canocchi POS</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <style>
-body { font-family: Arial; background:#f5f5f5; margin:0; }
+body{font-family:Arial;background:#f5f5f5;margin:0;}
 .hidden{display:none;}
-.card{background:#fff;padding:15px;border-radius:8px;max-width:900px;margin:15px auto;}
+#login-view{text-align:center;margin-top:60px;}
+#login-view img{width:170px;margin-bottom:20px;}
 input{width:100%;padding:10px;margin:6px 0;border-radius:6px;border:1px solid #ccc;}
 .btn-rojo{background:#E53935;color:#fff;border:none;padding:10px;border-radius:6px;cursor:pointer;}
 .btn-negro{background:#000;color:#fff;border:none;padding:10px;border-radius:6px;cursor:pointer;}
+.card{background:#fff;padding:15px;border-radius:8px;max-width:900px;margin:15px auto;}
 table{width:100%;border-collapse:collapse;}
 td,th{border:1px solid #ccc;padding:6px;}
 #scanner{width:100%;height:250px;background:#000;margin-top:10px;}
@@ -25,11 +26,11 @@ td,th{border:1px solid #ccc;padding:6px;}
 
 <!-- LOGIN -->
 <div id="login-view">
-<img src="CanocchiLogo.PNG" style="width:170px;">
+<img src="CanocchiLogo.PNG">
 <input id="user" placeholder="Usuario">
 <input id="pass" type="password" placeholder="Contraseña">
-<button class="btn-rojo" onclick="doLogin()">Ingresar</button>
-<div id="login-msg"></div>
+<button class="btn-rojo" id="btnLogin">Ingresar</button>
+<div id="login-msg" style="color:red;"></div>
 </div>
 
 <!-- POS -->
@@ -39,215 +40,199 @@ td,th{border:1px solid #ccc;padding:6px;}
 <h2>Canocchi POS</h2>
 <div>
 <span id="empleado-label"></span>
-<button class="btn-rojo" onclick="logout()">Salir</button>
+<button class="btn-rojo" id="logoutBtn">Salir</button>
 </div>
 </div>
 
 <hr>
 
-<button class="btn-negro" onclick="toggleScanner()">📷 Escanear</button>
-<button class="btn-negro" onclick="dashboard()">📊 Dashboard</button>
-<button class="btn-negro" onclick="historialHoy()">📄 Hoy</button>
-<button class="btn-negro" onclick="exportarExcel()">📥 Excel</button>
+<button class="btn-negro" id="scanBtn">📷 Escanear</button>
 
 <div id="scanner" class="hidden"></div>
 
-<input id="codigo-input" placeholder="Código" onkeydown="if(event.key==='Enter')buscarCodigo()">
-<button class="btn-rojo" onclick="buscarCodigo()">Agregar</button>
+<input id="codigo-input" placeholder="Código" />
 
 <table>
 <thead>
-<tr><th>Nombre</th><th>Cant</th><th>Precio</th><th></th></tr>
+<tr><th>Nombre</th><th>Precio</th><th></th></tr>
 </thead>
 <tbody id="carrito"></tbody>
 </table>
 
 <h3 style="text-align:right;">Total: $<span id="total">0</span></h3>
 
-<button class="btn-rojo" onclick="pagar()">Pagar</button>
+<button class="btn-rojo hidden" id="btnPagar">Pagar</button>
 
 </div>
 
 <script type="module">
 
+// 🔥 FIREBASE (TU CONFIG)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import {
-getFirestore, collection, query, where, getDocs, addDoc, updateDoc, doc
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, query, where, getDocs, addDoc, updateDoc, doc } 
+from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
-apiKey: "TU_API_KEY",
-authDomain: "TU_AUTH",
-projectId: "TU_PROJECT"
+  apiKey: "AIzaSyBg4WAoETa4fzO_eia4Nc9PraW_dkmeA4w",
+  authDomain: "canocchi-store---stock-control.firebaseapp.com",
+  projectId: "canocchi-store---stock-control",
+  storageBucket: "canocchi-store---stock-control.firebasestorage.app",
+  messagingSenderId: "1062366040495",
+  appId: "1:1062366040495:web:2afb9007cc568d11fa1f5a",
+  measurementId: "G-9EB87X6949"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// VARIABLES
 let carrito = [];
-let empleadoActual=null;
-let scanning=false;
+let empleado = null;
+let scanning = false;
 
-/* LOGIN /
-window.doLogin = async () => {
-    const u = document.getElementById("user").value;
-    const p = document.getElementById("pass").value;
+// ELEMENTOS
+const loginView = document.getElementById("login-view");
+const posView = document.getElementById("pos-view");
+const msg = document.getElementById("login-msg");
+const label = document.getElementById("empleado-label");
+const carritoBody = document.getElementById("carrito");
+const totalLabel = document.getElementById("total");
+const btnPagar = document.getElementById("btnPagar");
 
-    const q = query(
-        collection(db,"empleados"),
-        where("usuario","==",u),
-        where("password","==",p)
-    );
+// LOGIN
+document.getElementById("btnLogin").addEventListener("click", async ()=>{
+const u = document.getElementById("user").value.trim();
+const p = document.getElementById("pass").value.trim();
 
-    const s = await getDocs(q);
+const q = query(collection(db,"empleados"),
+where("usuario","==",u),
+where("password","==",p));
 
-    if (s.empty) {
-        document.getElementById("login-msg").textContent = "Error login";
-        return;
-    }
+const s = await getDocs(q);
 
-    empleadoActual = u;
+if(s.empty){ msg.textContent="Datos incorrectos"; return; }
 
-    document.getElementById("login-view").classList.add("hidden");
-    document.getElementById("pos-view").classList.remove("hidden");
-    document.getElementById("empleado-label").textContent = u;
+empleado = u;
+
+loginView.classList.add("hidden");
+posView.classList.remove("hidden");
+label.textContent = u;
+});
+
+// LOGOUT
+document.getElementById("logoutBtn").onclick=()=>location.reload();
+
+// BUSCAR PRODUCTO
+document.getElementById("codigo-input").addEventListener("keydown",e=>{
+if(e.key==="Enter") buscar();
+});
+
+async function buscar(codeManual){
+const code = codeManual || document.getElementById("codigo-input").value.trim();
+if(!code) return;
+
+const q = query(collection(db,"productos"),where("codigo","==",code));
+const s = await getDocs(q);
+
+if(s.empty){ alert("No existe"); return; }
+
+const p = s.docs[0].data();
+
+carrito.push(p);
+render();
+}
+
+// RENDER
+function render(){
+let t=0;
+carritoBody.innerHTML="";
+
+carrito.forEach((p,i)=>{
+t+=p.precio;
+
+carritoBody.innerHTML+= <tr> <td>${p.nombre}</td> <td>${p.precio}</td> <td><button onclick="eliminar(${i})">X</button></td> </tr>;
+});
+
+totalLabel.textContent=t;
+
+// mostrar botón pagar
+btnPagar.classList.toggle("hidden", carrito.length===0);
+}
+
+// ELIMINAR
+window.eliminar = (i)=>{
+carrito.splice(i,1);
+render();
 };
 
-/ LOGOUT /
-window.logout=()=>location.reload();
+// SCANNER
+document.getElementById("scanBtn").onclick=()=>{
+const sc = document.getElementById("scanner");
+sc.classList.remove("hidden");
 
-/ SCANNER /
-window.toggleScanner=()=>{
-scanner.classList.toggle("hidden");
-
-if(!scanner.classList.contains("hidden")){
 Quagga.init({
-inputStream:{type:"LiveStream",target:scanner},
+inputStream:{type:"LiveStream",target:sc},
 decoder:{readers:["ean_reader","code_128_reader"]}
 },()=>Quagga.start());
 
 Quagga.onDetected(d=>{
-if(scanning)return;
+if(scanning) return;
 scanning=true;
-const code=d.codeResult.code;
+
+const code = d.codeResult.code;
+
 Quagga.stop();
-scanner.classList.add("hidden");
-buscarCodigo(code);
+sc.classList.add("hidden");
+
+buscar(code);
 });
-}
 };
 
-/ BUSCAR /
-window.buscarCodigo=async(codeManual)=>{
-const code=codeManual || codigo-input.value;
+// PAGAR
+btnPagar.onclick = async ()=>{
 
-const q=query(collection(db,"productos"),where("codigo","==",code));
-const s=await getDocs(q);
+const total = Number(totalLabel.textContent);
 
-if(s.empty){alert("No existe");return;}
+const metodo = prompt("1-Efectivo 2-QR 3-Transferencia 4-Tarjeta");
 
-const p=s.docs[0].data();
-carrito.push(p);
-render();
-};
+let vuelto = 0;
 
-/ RENDER /
-function render(){
-let t=0;
-carrito.innerHTML="";
-carrito.forEach((p,i)=>{
-t+=p.precio;
-carrito.innerHTML+=<tr> <td>${p.nombre}</td> <td>1</td> <td>${p.precio}</td> <td><button onclick="del(${i})">X</button></td> </tr>;
-});
-total.textContent=t;
+if(metodo==="1"){
+const paga = Number(prompt("¿Con cuánto paga?"));
+if(paga<total){alert("Monto insuficiente");return;}
+vuelto = paga - total;
+alert("Vuelto: $" + vuelto);
 }
 
-/ DELETE /
-window.del=i=>{carrito.splice(i,1);render();};
+let metodoTxt = {
+"1":"Efectivo",
+"2":"QR",
+"3":"Transferencia",
+"4":"Tarjeta"
+}[metodo] || "Otro";
 
-/ PAGAR /
-window.pagar=async()=>{
+// actualizar stock
 for(const p of carrito){
-const q=query(collection(db,"productos"),where("codigo","==",p.codigo));
-const s=await getDocs(q);
-const ref=doc(db,"productos",s.docs[0].id);
+const q = query(collection(db,"productos"),where("codigo","==",p.codigo));
+const s = await getDocs(q);
+const ref = doc(db,"productos",s.docs[0].id);
 await updateDoc(ref,{stock:p.stock-1});
 }
 
+// guardar venta
 await addDoc(collection(db,"ventas"),{
 fecha:Date.now(),
-empleado:empleadoActual,
-total:Number(total.textContent),
+empleado,
+metodo:metodoTxt,
+total,
+vuelto,
 items:carrito
 });
 
 carrito=[];
 render();
-alert("Venta OK");
-};
 
-/ DASHBOARD /
-window.dashboard=async()=>{
-const s=await getDocs(collection(db,"ventas"));
-
-let hoy=0, mes=0;
-let contador={};
-
-const now=new Date();
-
-s.forEach(d=>{
-const v=d.data();
-const f=new Date(v.fecha);
-
-if(f.toDateString()===now.toDateString()) hoy+=v.total;
-if(f.getMonth()===now.getMonth()) mes+=v.total;
-
-v.items.forEach(i=>{
-contador[i.nombre]=(contador[i.nombre]||0)+1;
-});
-});
-
-const ranking=Object.entries(contador)
-.sort((a,b)=>b[1]-a[1])
-.slice(0,5)
-.map(i=>i[0]+" ("+i[1]+")")
-.join("\n");
-
-alert(
-"DASHBOARD\n\n"+
-"Hoy: $"+hoy+"\n"+
-"Mes: $"+mes+"\n\n"+
-"Top productos:\n"+ranking
-);
-};
-
-/ HISTORIAL HOY /
-window.historialHoy=async()=>{
-const s=await getDocs(collection(db,"ventas"));
-let txt="VENTAS HOY\n\n";
-const now=new Date();
-
-s.forEach(d=>{
-const v=d.data();
-const f=new Date(v.fecha);
-if(f.toDateString()===now.toDateString()){
-txt+=${f.toLocaleTimeString()} - $${v.total}\n;
-}
-});
-
-alert(txt);
-};
-
-/ EXCEL */
-window.exportarExcel=async()=>{
-const s=await getDocs(collection(db,"ventas"));
-let data=[];
-s.forEach(d=>data.push(d.data()));
-
-const ws=XLSX.utils.json_to_sheet(data);
-const wb=XLSX.utils.book_new();
-XLSX.utils.book_append_sheet(wb,ws,"Ventas");
-XLSX.writeFile(wb,"ventas.xlsx");
+alert("Venta registrada");
 };
 
 </script>
