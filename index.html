@@ -2,709 +2,255 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Canocchi POS</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<!-- Quagga2 (cámara) -->
-<script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
-
-<!-- SheetJS para exportar Excel -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<title>Canocchi Full Store - POS</title>
 
 <style>
-    body {
-        font-family: Arial, sans-serif;
-        background: #f5f5f5;
-        margin: 0;
-        padding: 0;
-    }
-
-    .hidden { display: none; }
-
-    /* LOGIN MINIMALISTA */
-    #login-view {
-        max-width: 350px;
-        margin: 60px auto;
-        text-align: center;
-        padding: 20px;
-    }
-
-    #login-view img {
-        width: 170px;
-        margin-bottom: 25px;
-    }
-
-    input {
-        width: 100%;
-        padding: 10px;
-        margin: 6px 0;
-        border-radius: 6px;
-        border: 1px solid #ccc;
-        font-size: 15px;
-    }
-
-    /* BOTONES ESTILO D */
-    .btn-rojo {
-        background: #E53935;
-        color: white;
-        border: none;
-        padding: 10px 15px;
-        border-radius: 6px;
-        font-weight: bold;
-        cursor: pointer;
-        margin-top: 8px;
-    }
-
-    .btn-negro {
-        background: #000;
-        color: white;
-        border: none;
-        padding: 10px 15px;
-        border-radius: 6px;
-        font-weight: bold;
-        cursor: pointer;
-    }
-
-    .btn-mini {
-        background: white;
-        border: 2px solid #E53935;
-        border-radius: 6px;
-        padding: 4px;
-        cursor: pointer;
-    }
-
-    .card {
-        background: #fff;
-        padding: 15px;
-        border-radius: 8px;
-        max-width: 900px;
-        margin: 15px auto;
-        box-shadow: 0 2px 6px rgba(0,0,0,.1);
-    }
-
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 10px;
-    }
-
-    th, td {
-        border: 1px solid #ccc;
-        padding: 6px;
-        font-size: 14px;
-    }
-
-    th {
-        background: #eee;
-    }
-
-    #scanner-area {
-        width: 100%;
-        height: 250px;
-        background: #000;
-        margin-top: 10px;
-    }
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f2f2f2;
+}
+header {
+    background: #222;
+    color: white;
+    padding: 12px;
+    text-align: center;
+    font-size: 22px;
+    font-weight: bold;
+}
+.hidden { display: none; }
+.container {
+    padding: 20px;
+}
+input, select {
+    padding: 8px;
+    font-size: 16px;
+}
+button {
+    padding: 10px 14px;
+    font-size: 16px;
+    cursor: pointer;
+    border: none;
+    background: #333;
+    color: white;
+    border-radius: 6px;
+}
+button:hover {
+    background: #555;
+}
+.btn-mini {
+    padding: 4px 6px;
+    background: #c62828;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+table th, table td {
+    border: 1px solid #ccc;
+    padding: 8px;
+}
+.dark-mode {
+    background: #111;
+    color: white;
+}
+.dark-mode table td, .dark-mode table th {
+    border-color: #555;
+}
+.view {
+    padding: 20px;
+}
+.card {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+}
+.dark-mode .card {
+    background: #222;
+}
+#scanner-area {
+    width: 100%;
+    height: 260px;
+    background: black;
+}
 </style>
 </head>
+
 <body>
 
+<header>CANOCCHI FULL STORE — POS</header>
+
 <!-- LOGIN -->
-<div id="login-view">
-    <img src="CanocchiLogo.PNG">
-    <input id="user" placeholder="Usuario">
-    <input id="pass" type="password" placeholder="Contraseña">
-    <button class="btn-rojo" onclick="doLogin()">Ingresar</button>
-    <div id="login-msg" style="color:red;margin-top:6px;"></div>
+<div id="login-view" class="view">
+    <div class="card">
+        <h2>Iniciar sesión</h2>
+        <input id="user" placeholder="Usuario"><br><br>
+        <input id="pass" type="password" placeholder="Contraseña"><br><br>
+        <button onclick="doLogin()">Ingresar</button>
+        <p id="login-msg" style="color:red;"></p>
+    </div>
 </div>
 
-<!-- POS -->
-<div id="pos-view" class="hidden card">
+<!-- POS PRINCIPAL -->
+<div id="pos-view" class="view hidden">
+    <h2>Empleado: <span id="empleado-label"></span></h2>
 
-    <div style="display:flex;justify-content:space-between;align-items:center;">
-        <h2>Canocchi POS</h2>
-        <span>Empleado: <strong id="empleado-label"></strong></span>
-    </div>
+    <button onclick="toggleCam()">Escanear código</button>
+    <button onclick="abrirAltaCategoria()">Nueva categoría</button>
+    <button onclick="abrirPago()">Pagar</button>
+    <button onclick="abrirDashboard()">Dashboard</button>
+    <button onclick="abrirHistorial()">Historial</button>
+    <button onclick="abrirAdmin()">Admin</button>
+    <button onclick="toggleTema()">Tema</button>
 
-    <hr>
+    <br><br>
 
-    <!-- BOTONES SUPERIORES -->
-    <div style="display:flex;gap:10px;margin-bottom:10px;">
-        <button class="btn-negro" onclick="exportarExcel()">
-            <img src="logoexcel.png" style="width:28px;">
-        </button>
-
-        <button class="btn-negro" onclick="abrirAltaCategoria()">
-            <img src="agregar.png" style="width:28px;">
-        </button>
-    </div>
-
-    <h3>Escaneo / carga de producto</h3>
-
-    <input id="codigo-input" placeholder="Escaneá o escribí el código"
-           onkeydown="if(event.key==='Enter') buscarCodigo()">
-
-    <button class="btn-rojo" onclick="buscarCodigo()">Agregar</button>
-    <button class="btn-negro" onclick="toggleCam()">Cámara</button>
-
-    <div id="scan-msg" style="color:green;margin-top:4px;"></div>
+    <input id="codigo-input" placeholder="Código manual">
+    <button onclick="buscarCodigo()">Agregar</button>
+    <p id="scan-msg" style="color:green;"></p>
 
     <div id="scanner-area" class="hidden"></div>
-
-    <h3>Carrito</h3>
 
     <table>
         <thead>
             <tr>
                 <th>Código</th>
-                <th>Nombre</th>
-                <th>Cant.</th>
+                <th>Producto</th>
+                <th>Cant</th>
                 <th>Precio</th>
-                <th>Subtotal</th>
+                <th>Subt</th>
                 <th></th>
             </tr>
         </thead>
         <tbody id="carrito-body"></tbody>
     </table>
 
-    <p style="text-align:right;font-size:18px;margin-top:10px;">
-        Total: $<span id="total-label">0</span>
-    </p>
+    <h2>Total: $<span id="total-label">0.00</span></h2>
 </div>
 
 <!-- ALTA PRODUCTO -->
-<div id="alta-container" class="hidden card">
-    <h3>Agregar producto</h3>
-
-    <label>Código</label>
-    <input id="alta-codigo" readonly>
-
-    <label>Nombre</label>
-    <input id="alta-nombre">
-
-    <label>Precio</label>
-    <input id="alta-precio" type="number" step="0.01">
-
-    <label>Stock inicial</label>
-    <input id="alta-stock" type="number">
-
-    <label>Categoría</label>
-    <select id="alta-categoria"></select>
-
-    <button class="btn-negro" onclick="abrirAltaCategoria()">Nueva categoría</button>
-    <br><br>
-
-    <button class="btn-rojo" onclick="guardarProducto()">Guardar</button>
-    <button class="btn-negro" onclick="cerrarAltaProducto()">Cancelar</button>
+<div id="alta-container" class="view hidden">
+    <div class="card">
+        <h2>Nuevo producto</h2>
+        <input id="alta-codigo" placeholder="Código"><br><br>
+        <input id="alta-nombre" placeholder="Nombre"><br><br>
+        <input id="alta-precio" type="number" placeholder="Precio"><br><br>
+        <input id="alta-stock" type="number" placeholder="Stock"><br><br>
+        <select id="alta-categoria"></select><br><br>
+        <button onclick="guardarProducto()">Guardar</button>
+        <button onclick="cerrarAltaProducto()">Cancelar</button>
+    </div>
 </div>
 
 <!-- ALTA CATEGORÍA -->
-<div id="alta-categoria-card" class="hidden card">
-    <h3>Nueva categoría</h3>
-    <input id="categoria-nombre" placeholder="Nombre de la categoría">
-    <button class="btn-rojo" onclick="guardarCategoria()">Guardar</button>
-    <button class="btn-negro" onclick="cerrarAltaCategoria()">Cancelar</button>
+<div id="alta-categoria-card" class="view hidden">
+    <div class="card">
+        <h2>Nueva categoría</h2>
+        <input id="categoria-nombre" placeholder="Nombre"><br><br>
+        <button onclick="guardarCategoria()">Guardar</button>
+        <button onclick="cerrarAltaCategoria()">Cancelar</button>
+    </div>
 </div>
 
-<!-- FIREBASE + LÓGICA -->
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import {
-    getFirestore,
-    collection,
-    query,
-    where,
-    getDocs,
-    addDoc
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-const firebaseConfig = {
-    apiKey: "AIzaSyB4gAWoETaf4f2O_eia4Nc9PraW_dkmeA4w",
-    authDomain: "canocchi-store---stock-control.firebaseapp.com",
-    projectId: "canocchi-store---stock-control",
-    storageBucket: "canocchi-store---stock-control.firebasestorage.app",
-    messagingSenderId: "106236604495",
-    appId: "1:106236604495:web:2af8b907cc568d11fa1f5a",
-    measurementId: "G-9EB7X6949"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-let empleadoActual = null;
-let carrito = [];
-let scanning = false;
-
-/* LOGIN */
-window.doLogin = async function () {
-    const usuario = document.getElementById("user").value.trim();
-    const password = document.getElementById("pass").value.trim();
-
-    document.getElementById("login-msg").textContent = "";
-
-    const q = query(
-        collection(db, "empleados"),
-        where("usuario", "==", usuario),
-        where("password", "==", password)
-    );
-
-    const snap = await getDocs(q);
-
-    if (snap.empty) {
-        document.getElementById("login-msg").textContent = "Usuario o contraseña incorrectos.";
-        return;
-    }
-
-    empleadoActual = snap.docs[0].data().nombre;
-    document.getElementById("empleado-label").textContent = empleadoActual;
-
-    document.getElementById("login-view").classList.add("hidden");
-    document.getElementById("pos-view").classList.remove("hidden");
-
-    cargarCategorias();
-};
-
-/* BUSCAR PRODUCTO */
-window.buscarCodigo = async function (manualCode) {
-    const codigo = (manualCode || document.getElementById("codigo-input").value).trim();
-    document.getElementById("scan-msg").textContent = "";
-
-    if (!codigo) return;
-
-    const q = query(
-        collection(db, "productos"),
-        where("codigo", "==", codigo),
-        where("activo", "==", true)
-    );
-
-    const snap = await getDocs(q);
-
-    if (snap.empty) {
-        document.getElementById("scan-msg").textContent = "Producto no encontrado. Podés agregarlo.";
-        document.getElementById("alta-container").classList.remove("hidden");
-        document.getElementById("alta-codigo").value = codigo;
-        return;
-    }
-
-    const prod = snap.docs[0].data();
-    agregarAlCarrito(prod);
-
-    document.getElementById("scan-msg").textContent = "Producto agregado: " + prod.nombre;
-
-    document.getElementById("codigo-input").value = "";
-    document.getElementById("codigo-input").focus();
-};
-
-/* ALTA PRODUCTO */
-window.guardarProducto = async function () {
-    const codigo = document.getElementById("alta-codigo").value.trim();
-    const nombre = document.getElementById("alta-nombre").value.trim();
-    const precio = Number(document.getElementById("alta-precio").value);
-    const stock = Number(document.getElementById("alta-stock").value);
-    const categoria = document.getElementById("alta-categoria").value;
-
-    if (!codigo || !nombre || !precio || !stock || !categoria) {
-        alert("Completá todos los campos.");
-        return;
-    }
-
-    await addDoc(collection(db, "productos"), {
-        codigo, nombre, precio, stock, categoria, activo: true
-    });
-
-    alert("Producto agregado.");
-    cerrarAltaProducto();
-};
-
-window.cerrarAltaProducto = function () {
-    document.getElementById("alta-container").classList.add("hidden");
-    document.getElementById("alta-nombre").value = "";
-    document.getElementById("alta-precio").value = "";
-    document.getElementById("alta-stock").value = "";
-};
-
-/* CATEGORÍAS */
-async function cargarCategorias() {
-    const snap = await getDocs(collection(db, "categorias"));
-    const sel = document.getElementById("alta-categoria");
-
-    sel.innerHTML = '<option value="">Seleccionar...</option>';
-
-    snap.forEach(doc => {
-        const c = doc.data();
-        sel.innerHTML += `<option value="${c.nombre}">${c.nombre}</option>`;
-    });
-}
-
-window.abrirAltaCategoria = function () {
-    document.getElementById("alta-categoria-card").classList.remove("hidden");
-};
-
-window.cerrarAltaCategoria = function () {
-    document.getElementById("alta-categoria-card").classList.add("hidden");
-    document.getElementById("categoria-nombre").value = "";
-};
-
-window.guardarCategoria = async function () {
-    const nombre = document.getElementById("categoria-nombre").value.trim();
-    if (!nombre) return alert("Ingresá un nombre.");
-
-    await addDoc(collection(db, "categorias"), { nombre });
-
-    alert("Categoría agregada.");
-    cerrarAltaCategoria();
-    cargarCategorias();
-};
-
-/* CARRITO */
-function agregarAlCarrito(prod) {
-    const existe = carrito.find(i => i.codigo == prod.codigo);
-
-    if (existe) existe.cantidad++;
-    else carrito.push({ ...prod, cantidad: 1 });
-
-    renderCarrito();
-}
-
-function renderCarrito() {
-    const tbody = document.getElementById("carrito-body");
-    tbody.innerHTML = "";
-    let total = 0;
-
-    carrito.forEach((item, i) => {
-        const sub = item.cantidad * item.precio;
-        total += sub;
-
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-            <td>${item.codigo}</td>
-            <td>${item.nombre}</td>
-            <td><input type="number" min="1" value="${item.cantidad}" style="width:60px;"></td>
-            <td>${item.precio.toFixed(2)}</td>
-            <td>${sub.toFixed(2)}</td>
-            <td>
-                <button class="btn-mini" onclick="eliminarItem(${i})">
-                    <img src="eliminar.png" style="width:20px;">
-                </button>
-            </td>
-        `;
-
-        tr.querySelector("input").onchange = e => {
-            const val = Number(e.target.value);
-            if (val <= 0) carrito.splice(i, 1);
-            else carrito[i].cantidad = val;
-            renderCarrito();
-        };
-
-        tbody.appendChild(tr);
-    });
-
-    document.getElementById("total-label").textContent = total.toFixed(2);
-}
-
-window.eliminarItem = function (i) {
-    carrito.splice(i, 1);
-    renderCarrito();
-};
-
-/* EXPORTAR EXCEL */
-window.exportarExcel = async function () {
-    const snap = await getDocs(collection(db, "ventas"));
-    const rows = [];
-
-    snap.forEach(doc => rows.push(doc.data()));
-
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Ventas");
-
-    XLSX.writeFile(wb, "ventas.xlsx");
-};
-
-/* CÁMARA */
-window.toggleCam = function () {
-    const area = document.getElementById("scanner-area");
-
-    if (area.classList.contains("hidden")) {
-        area.classList.remove("hidden");
-        startQuagga();
-    } else {
-        area.classList.add("hidden");
-        try { Quagga.stop(); } catch(e) {}
-    }
-};
-
-function startQuagga() {
-    scanning = true;
-
-    Quagga.init({
-        inputStream: {
-            type: "LiveStream",
-            target: document.getElementById("scanner-area"),
-            constraints: { facingMode: "environment" }
-        },
-        decoder: {
-            readers: [
-                "ean_reader",
-                "ean_8_reader",
-                "upc_reader",
-                "upc_e_reader",
-                "code_128_reader",
-                "code_39_reader"
-            ]
-        }
-    }, err => {
-        if (err) return console.error(err);
-        Quagga.start();
-    });
-
-    Quagga.onDetected(res => {
-        if (!scanning) return;
-        scanning = false;
-
-        const code = res.codeResult.code;
-
-        try { Quagga.stop(); } catch(e) {}
-        document.getElementById("scanner-area").classList.add("hidden");
-
-        buscarCodigo(code);
-    });
-}
-</script>
-
-</body>
-</html>
-<!-- POS -->
-<div id="pos-view" class="hidden card">
-
-    <div style="display:flex;justify-content:space-between;align-items:center;">
-        <h2>Canocchi POS</h2>
-        <span>Empleado: <strong id="empleado-label"></strong></span>
+<!-- PAGO -->
+<div id="pago-view" class="view hidden">
+    <div class="card">
+        <h2>Seleccionar método de pago</h2>
+        <button onclick="pagarTarjeta()">Tarjeta</button>
+        <button onclick="pagarQR()">QR</button>
+        <button onclick="pagarTransferencia()">Transferencia</button>
+        <button onclick="pagarEfectivo()">Efectivo</button>
+        <br><br>
+        <div id="efectivo-box" class="hidden">
+            <input id="monto-entregado" type="number" placeholder="Monto entregado">
+            <button onclick="confirmarEfectivo()">Confirmar</button>
+            <p id="vuelto-label"></p>
+        </div>
+        <br>
+        <button onclick="cerrarPago()">Cancelar</button>
     </div>
-
-    <hr>
-
-    <!-- BOTONES SUPERIORES -->
-    <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
-        <button class="btn-negro" onclick="exportarExcel()">
-            <img src="logoexcel.png" style="width:28px;">
-        </button>
-
-        <button class="btn-negro" onclick="abrirAltaCategoria()">
-            <img src="agregar.png" style="width:28px;">
-        </button>
-
-        <button class="btn-negro" onclick="abrirCierreCaja()">Cierre de caja</button>
-        <button class="btn-negro" onclick="abrirDashboard()">Dashboard</button>
-        <button class="btn-negro" onclick="abrirHistorial()">Historial</button>
-        <button class="btn-negro" onclick="abrirAdmin()">Admin</button>
-        <button class="btn-negro" onclick="toggleTema()">Tema</button>
-    </div>
-
-    <h3>Escaneo / carga de producto</h3>
-
-    <input id="codigo-input" placeholder="Escaneá o escribí el código"
-           onkeydown="if(event.key==='Enter') buscarCodigo()">
-
-    <button class="btn-rojo" onclick="buscarCodigo()">Agregar</button>
-    <button class="btn-negro" onclick="toggleCam()">Cámara</button>
-
-    <div id="scan-msg" style="color:green;margin-top:4px;"></div>
-
-    <div id="scanner-area" class="hidden"></div>
-
-    <h3>Carrito</h3>
-
-    <table>
-        <thead>
-            <tr>
-                <th>Código</th>
-                <th>Nombre</th>
-                <th>Cant.</th>
-                <th>Precio</th>
-                <th>Subtotal</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody id="carrito-body"></tbody>
-    </table>
-
-    <p style="text-align:right;font-size:18px;margin-top:10px;">
-        Total: $<span id="total-label">0</span>
-    </p>
-
-    <button class="btn-rojo" onclick="abrirPago()">Finalizar venta</button>
-</div>
-
-<!-- ALTA PRODUCTO -->
-<div id="alta-container" class="hidden card">
-    <h3>Agregar producto</h3>
-
-    <label>Código</label>
-    <input id="alta-codigo" readonly>
-
-    <label>Nombre</label>
-    <input id="alta-nombre">
-
-    <label>Precio</label>
-    <input id="alta-precio" type="number" step="0.01">
-
-    <label>Stock inicial</label>
-    <input id="alta-stock" type="number">
-
-    <label>Categoría</label>
-    <select id="alta-categoria"></select>
-
-    <button class="btn-negro" onclick="abrirAltaCategoria()">Nueva categoría</button>
-    <br><br>
-
-    <button class="btn-rojo" onclick="guardarProducto()">Guardar</button>
-    <button class="btn-negro" onclick="cerrarAltaProducto()">Cancelar</button>
-</div>
-
-<!-- ALTA CATEGORÍA -->
-<div id="alta-categoria-card" class="hidden card">
-    <h3>Nueva categoría</h3>
-    <input id="categoria-nombre" placeholder="Nombre de la categoría">
-    <button class="btn-rojo" onclick="guardarCategoria()">Guardar</button>
-    <button class="btn-negro" onclick="cerrarAltaCategoria()">Cancelar</button>
-</div>
-
-<!-- MÉTODO DE PAGO -->
-<div id="pago-view" class="hidden card">
-    <h3>Seleccionar método de pago</h3>
-
-    <div style="display:flex;gap:15px;flex-wrap:wrap;">
-
-        <button class="btn-negro" onclick="pagarTarjeta()">
-            <img src="Tarjeta.png" style="width:80px;">
-        </button>
-
-        <button class="btn-negro" onclick="pagarQR()">
-            <img src="metodoqr.png" style="width:80px;">
-        </button>
-
-        <button class="btn-negro" onclick="pagarEfectivo()">
-            <img src="EFECTIVO.png" style="width:80px;">
-        </button>
-
-        <button class="btn-negro" onclick="pagarTransferencia()">
-            <img src="TRANSFERENCIA.PNG" style="width:80px;">
-        </button>
-
-    </div>
-
-    <div id="efectivo-box" class="hidden" style="margin-top:20px;">
-        <h4>Pago en efectivo</h4>
-        <label>Monto entregado</label>
-        <input id="monto-entregado" type="number" step="0.01">
-        <button class="btn-rojo" onclick="confirmarEfectivo()">Confirmar</button>
-        <p id="vuelto-label" style="font-size:18px;margin-top:10px;"></p>
-    </div>
-
-    <button class="btn-negro" onclick="cerrarPago()">Cancelar</button>
 </div>
 
 <!-- TICKET -->
-<div id="ticket-view" class="hidden card" style="max-width:400px;">
-    <h3 style="text-align:center;">CANOCCHI FULL STORE</h3>
-    <p id="ticket-fecha"></p>
-    <p id="ticket-empleado"></p>
-
-    <table>
-        <thead>
-            <tr>
-                <th>Producto</th>
-                <th>Cant</th>
-                <th>Subt</th>
-            </tr>
-        </thead>
-        <tbody id="ticket-items"></tbody>
-    </table>
-
-    <p style="text-align:right;font-size:18px;">
-        Total: $<span id="ticket-total"></span>
-    </p>
-
-    <p id="ticket-metodo"></p>
-    <p id="ticket-vuelto"></p>
-
-    <div style="text-align:center;margin-top:10px;">
-        <img id="ticket-qr" style="width:150px;">
+<div id="ticket-view" class="view hidden">
+    <div class="card">
+        <h2>Ticket</h2>
+        <table>
+            <thead>
+                <tr><th>Producto</th><th>Cant</th><th>Subtotal</th></tr>
+            </thead>
+            <tbody id="ticket-items"></tbody>
+        </table>
+        <h3>Total: $<span id="ticket-total"></span></h3>
+        <p id="ticket-fecha"></p>
+        <p id="ticket-empleado"></p>
+        <p id="ticket-metodo"></p>
+        <p id="ticket-vuelto"></p>
+        <img id="ticket-qr" style="width:200px;">
+        <br><br>
+        <button onclick="cerrarTicket()">Cerrar</button>
     </div>
-
-    <button class="btn-rojo" onclick="window.print()">Imprimir</button>
-    <button class="btn-negro" onclick="cerrarTicket()">Cerrar</button>
 </div>
 
 <!-- CIERRE DE CAJA -->
-<div id="cierre-view" class="hidden card">
-    <h3>Cierre de caja</h3>
-
-    <p>Total del día: $<span id="cierre-total"></span></p>
-    <p>Ventas realizadas: <span id="cierre-cantidad"></span></p>
-
-    <h4>Detalle por método</h4>
-    <ul>
-        <li>Tarjeta: $<span id="cierre-tarjeta"></span></li>
-        <li>QR: $<span id="cierre-qr"></span></li>
-        <li>Efectivo: $<span id="cierre-efectivo"></span></li>
-        <li>Transferencia: $<span id="cierre-transferencia"></span></li>
-    </ul>
-
-    <button class="btn-rojo" onclick="imprimirCierre()">Imprimir</button>
-    <button class="btn-negro" onclick="cerrarCierreCaja()">Cerrar</button>
+<div id="cierre-view" class="view hidden">
+    <div class="card">
+        <h2>Cierre de caja</h2>
+        <p>Total vendido: $<span id="cierre-total"></span></p>
+        <p>Cantidad ventas: <span id="cierre-cantidad"></span></p>
+        <p>Tarjeta: $<span id="cierre-tarjeta"></span></p>
+        <p>QR: $<span id="cierre-qr"></span></p>
+        <p>Efectivo: $<span id="cierre-efectivo"></span></p>
+        <p>Transferencia: $<span id="cierre-transferencia"></span></p>
+        <button onclick="imprimirCierre()">Imprimir</button>
+        <button onclick="cerrarCierreCaja()">Cerrar</button>
+    </div>
 </div>
 
 <!-- DASHBOARD -->
-<div id="dashboard-view" class="hidden card">
-    <h3>Dashboard</h3>
-
-    <p>Ventas hoy: <strong id="dash-hoy"></strong></p>
-    <p>Ventas este mes: <strong id="dash-mes"></strong></p>
-    <p>Producto más vendido: <strong id="dash-top"></strong></p>
-
-    <button class="btn-negro" onclick="cerrarDashboard()">Cerrar</button>
+<div id="dashboard-view" class="view hidden">
+    <div class="card">
+        <h2>Dashboard</h2>
+        <p>Ventas hoy: <span id="dash-hoy"></span></p>
+        <p>Ventas mes: <span id="dash-mes"></span></p>
+        <p>Producto más vendido: <span id="dash-top"></span></p>
+        <button onclick="cerrarDashboard()">Cerrar</button>
+    </div>
 </div>
 
 <!-- HISTORIAL -->
-<div id="historial-view" class="hidden card">
-    <h3>Historial de ventas</h3>
-
-    <table>
-        <thead>
-            <tr>
-                <th>Fecha</th>
-                <th>Método</th>
-                <th>Total</th>
-            </tr>
-        </thead>
-        <tbody id="historial-body"></tbody>
-    </table>
-
-    <button class="btn-negro" onclick="cerrarHistorial()">Cerrar</button>
+<div id="historial-view" class="view hidden">
+    <div class="card">
+        <h2>Historial de ventas</h2>
+        <table>
+            <thead>
+                <tr><th>Fecha</th><th>Método</th><th>Total</th></tr>
+            </thead>
+            <tbody id="historial-body"></tbody>
+        </table>
+        <button onclick="cerrarHistorial()">Cerrar</button>
+    </div>
 </div>
 
 <!-- ADMIN -->
-<div id="admin-view" class="hidden card">
-    <h3>Administración</h3>
-
-    <button class="btn-rojo" onclick="abrirCierreCaja()">Cierre de caja</button>
-    <button class="btn-rojo" onclick="abrirDashboard()">Dashboard</button>
-    <button class="btn-rojo" onclick="abrirHistorial()">Historial</button>
-
-    <button class="btn-negro" onclick="cerrarAdmin()">Cerrar</button>
+<div id="admin-view" class="view hidden">
+    <div class="card">
+        <h2>Administración</h2>
+        <button onclick="exportarExcel()">Exportar ventas</button>
+        <button onclick="exportarReporteMensual()">Reporte mensual</button>
+        <button onclick="abrirCierreCaja()">Cierre de caja</button>
+        <button onclick="cerrarAdmin()">Cerrar</button>
+    </div>
 </div>
+<!-- ============================
+     FIREBASE + APP
+============================ -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import {
-    getFirestore,
-    collection,
-    query,
-    where,
-    getDocs,
-    addDoc,
-    updateDoc
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, getDocs, getDoc, setDoc, doc, updateDoc, addDoc } 
+from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyB4gAWoETaf4f2O_eia4Nc9PraW_dkmeA4w",
@@ -718,192 +264,47 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-
-let empleadoActual = null;
-let carrito = [];
-let scanning = false;
 
 /* ============================
    LOGIN
 ============================ */
 window.doLogin = async function () {
-    const usuario = document.getElementById("user").value.trim();
-    const password = document.getElementById("pass").value.trim();
+    const u = document.getElementById("user").value.trim();
+    const p = document.getElementById("pass").value.trim();
 
-    document.getElementById("login-msg").textContent = "";
-
-    const q = query(
-        collection(db, "empleados"),
-        where("usuario", "==", usuario),
-        where("password", "==", password)
-    );
-
-    const snap = await getDocs(q);
-
-    if (snap.empty) {
-        document.getElementById("login-msg").textContent = "Usuario o contraseña incorrectos.";
-        return;
+    if (u === "admin" && p === "1234") {
+        document.getElementById("login-view").classList.add("hidden");
+        document.getElementById("pos-view").classList.remove("hidden");
+        document.getElementById("empleado-label").textContent = "Administrador";
+    } else {
+        document.getElementById("login-msg").textContent = "Usuario o contraseña incorrectos";
     }
-
-    empleadoActual = snap.docs[0].data().nombre;
-    document.getElementById("empleado-label").textContent = empleadoActual;
-
-    document.getElementById("login-view").classList.add("hidden");
-    document.getElementById("pos-view").classList.remove("hidden");
-
-    cargarCategorias();
-};
-
-/* ============================
-   BUSCAR PRODUCTO
-============================ */
-window.buscarCodigo = async function (manualCode) {
-    const codigo = (manualCode || document.getElementById("codigo-input").value).trim();
-    document.getElementById("scan-msg").textContent = "";
-
-    if (!codigo) return;
-
-    const q = query(
-        collection(db, "productos"),
-        where("codigo", "==", codigo),
-        where("activo", "==", true)
-    );
-
-    const snap = await getDocs(q);
-
-    if (snap.empty) {
-        document.getElementById("scan-msg").textContent = "Producto no encontrado. Podés agregarlo.";
-        document.getElementById("alta-container").classList.remove("hidden");
-        document.getElementById("alta-codigo").value = codigo;
-        return;
-    }
-
-    const prod = snap.docs[0].data();
-
-    alertaStockBajo(prod);
-    agregarAlCarrito(prod);
-
-    document.getElementById("scan-msg").textContent = "Producto agregado: " + prod.nombre;
-
-    document.getElementById("codigo-input").value = "";
-    document.getElementById("codigo-input").focus();
-};
-
-/* ============================
-   ALERTA STOCK BAJO
-============================ */
-function alertaStockBajo(prod) {
-    if (prod.stock <= 5) {
-        alert("⚠️ Stock bajo de: " + prod.nombre + " (quedan " + prod.stock + ")");
-    }
-}
-
-/* ============================
-   ALTA PRODUCTO
-============================ */
-window.guardarProducto = async function () {
-    const codigo = document.getElementById("alta-codigo").value.trim();
-    const nombre = document.getElementById("alta-nombre").value.trim();
-    const precio = Number(document.getElementById("alta-precio").value);
-    const stock = Number(document.getElementById("alta-stock").value);
-    const categoria = document.getElementById("alta-categoria").value;
-
-    if (!codigo || !nombre || !precio || !stock || !categoria) {
-        alert("Completá todos los campos.");
-        return;
-    }
-
-    await addDoc(collection(db, "productos"), {
-        codigo, nombre, precio, stock, categoria, activo: true
-    });
-
-    alert("Producto agregado.");
-    cerrarAltaProducto();
-};
-
-window.cerrarAltaProducto = function () {
-    document.getElementById("alta-container").classList.add("hidden");
-    document.getElementById("alta-nombre").value = "";
-    document.getElementById("alta-precio").value = "";
-    document.getElementById("alta-stock").value = "";
-};
-
-/* ============================
-   CATEGORÍAS
-============================ */
-async function cargarCategorias() {
-    const snap = await getDocs(collection(db, "categorias"));
-    const sel = document.getElementById("alta-categoria");
-
-    sel.innerHTML = '<option value="">Seleccionar...</option>';
-
-    snap.forEach(doc => {
-        const c = doc.data();
-        sel.innerHTML += `<option value="${c.nombre}">${c.nombre}</option>`;
-    });
-}
-
-window.abrirAltaCategoria = function () {
-    document.getElementById("alta-categoria-card").classList.remove("hidden");
-};
-
-window.cerrarAltaCategoria = function () {
-    document.getElementById("alta-categoria-card").classList.add("hidden");
-    document.getElementById("categoria-nombre").value = "";
-};
-
-window.guardarCategoria = async function () {
-    const nombre = document.getElementById("categoria-nombre").value.trim();
-    if (!nombre) return alert("Ingresá un nombre.");
-
-    await addDoc(collection(db, "categorias"), { nombre });
-
-    alert("Categoría agregada.");
-    cerrarAltaCategoria();
-    cargarCategorias();
 };
 
 /* ============================
    CARRITO
 ============================ */
-function agregarAlCarrito(prod) {
-    const existe = carrito.find(i => i.codigo == prod.codigo);
+let carrito = [];
 
-    if (existe) existe.cantidad++;
-    else carrito.push({ ...prod, cantidad: 1 });
-
-    renderCarrito();
-}
-
-function renderCarrito() {
+function actualizarCarrito() {
     const tbody = document.getElementById("carrito-body");
     tbody.innerHTML = "";
+
     let total = 0;
 
-    carrito.forEach((item, i) => {
-        const sub = item.cantidad * item.precio;
-        total += sub;
-
+    carrito.forEach((item, index) => {
         const tr = document.createElement("tr");
+        const subtotal = item.precio * item.cantidad;
+        total += subtotal;
+
         tr.innerHTML = `
             <td>${item.codigo}</td>
             <td>${item.nombre}</td>
-            <td><input type="number" min="1" value="${item.cantidad}" style="width:60px;"></td>
+            <td>${item.cantidad}</td>
             <td>${item.precio.toFixed(2)}</td>
-            <td>${sub.toFixed(2)}</td>
-            <td>
-                <button class="btn-mini" onclick="eliminarItem(${i})">
-                    <img src="eliminar.png" style="width:20px;">
-                </button>
-            </td>
+            <td>${subtotal.toFixed(2)}</td>
+            <td><button class="btn-mini" onclick="eliminarItem(${index})">X</button></td>
         `;
-
-        tr.querySelector("input").onchange = e => {
-            const val = Number(e.target.value);
-            if (val <= 0) carrito.splice(i, 1);
-            else carrito[i].cantidad = val;
-            renderCarrito();
-        };
 
         tbody.appendChild(tr);
     });
@@ -913,132 +314,118 @@ function renderCarrito() {
 
 window.eliminarItem = function (i) {
     carrito.splice(i, 1);
-    renderCarrito();
+    actualizarCarrito();
 };
 
 /* ============================
-   EXPORTAR EXCEL (VENTAS)
+   BUSCAR PRODUCTO
 ============================ */
-window.exportarExcel = async function () {
-    const snap = await getDocs(collection(db, "ventas"));
-    const rows = [];
+window.buscarCodigo = async function () {
+    const codigo = document.getElementById("codigo-input").value.trim();
+    if (!codigo) return;
 
-    snap.forEach(doc => rows.push(doc.data()));
+    const ref = doc(db, "productos", codigo);
+    const snap = await getDoc(ref);
 
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Ventas");
-
-    XLSX.writeFile(wb, "ventas.xlsx");
-};
-
-/* ============================
-   REPORTE MENSUAL
-============================ */
-window.exportarReporteMensual = async function () {
-    const snap = await getDocs(collection(db, "ventas"));
-    const rows = [];
-
-    const mesActual = new Date().getMonth();
-
-    snap.forEach(doc => {
-        const v = doc.data();
-        const fecha = new Date(v.fecha);
-
-        if (fecha.getMonth() === mesActual) {
-            rows.push(v);
-        }
-    });
-
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Reporte Mensual");
-
-    XLSX.writeFile(wb, "reporte_mensual.xlsx");
-};
-
-/* ============================
-   CÁMARA
-============================ */
-window.toggleCam = function () {
-    const area = document.getElementById("scanner-area");
-
-    if (area.classList.contains("hidden")) {
-        area.classList.remove("hidden");
-        startQuagga();
-    } else {
-        area.classList.add("hidden");
-        try { Quagga.stop(); } catch(e) {}
+    if (!snap.exists()) {
+        document.getElementById("scan-msg").textContent = "Producto no encontrado";
+        return;
     }
+
+    const p = snap.data();
+
+    carrito.push({
+        codigo,
+        nombre: p.nombre,
+        precio: p.precio,
+        cantidad: 1
+    });
+
+    document.getElementById("scan-msg").textContent = "Producto agregado";
+    actualizarCarrito();
 };
 
-function startQuagga() {
-    scanning = true;
+/* ============================
+   ALTA PRODUCTO
+============================ */
+window.abrirAltaProducto = function () {
+    document.getElementById("alta-container").classList.remove("hidden");
+};
 
-    Quagga.init({
-        inputStream: {
-            type: "LiveStream",
-            target: document.getElementById("scanner-area"),
-            constraints: { facingMode: "environment" }
-        },
-        decoder: {
-            readers: [
-                "ean_reader",
-                "ean_8_reader",
-                "upc_reader",
-                "upc_e_reader",
-                "code_128_reader",
-                "code_39_reader"
-            ]
-        }
-    }, err => {
-        if (err) return console.error(err);
-        Quagga.start();
+window.cerrarAltaProducto = function () {
+    document.getElementById("alta-container").classList.add("hidden");
+};
+
+window.guardarProducto = async function () {
+    const codigo = document.getElementById("alta-codigo").value.trim();
+    const nombre = document.getElementById("alta-nombre").value.trim();
+    const precio = Number(document.getElementById("alta-precio").value);
+    const stock = Number(document.getElementById("alta-stock").value);
+    const categoria = document.getElementById("alta-categoria").value;
+
+    await setDoc(doc(db, "productos", codigo), {
+        nombre, precio, stock, categoria
     });
 
-    Quagga.onDetected(res => {
-        if (!scanning) return;
-        scanning = false;
+    alert("Producto guardado");
+    cerrarAltaProducto();
+};
 
-        const code = res.codeResult.code;
+/* ============================
+   ALTA CATEGORÍA
+============================ */
+window.abrirAltaCategoria = function () {
+    document.getElementById("alta-categoria-card").classList.remove("hidden");
+};
 
-        try { Quagga.stop(); } catch(e) {}
-        document.getElementById("scanner-area").classList.add("hidden");
+window.cerrarAltaCategoria = function () {
+    document.getElementById("alta-categoria-card").classList.add("hidden");
+};
 
-        buscarCodigo(code);
-    });
-}
+window.guardarCategoria = async function () {
+    const nombre = document.getElementById("categoria-nombre").value.trim();
+    if (!nombre) return;
+
+    await addDoc(collection(db, "categorias"), { nombre });
+
+    alert("Categoría guardada");
+    cerrarAltaCategoria();
+};
 
 /* ============================
    PAGO
 ============================ */
 window.abrirPago = function () {
-    if (carrito.length === 0) {
-        alert("No hay productos en el carrito.");
-        return;
-    }
-
-    document.getElementById("pos-view").classList.add("hidden");
     document.getElementById("pago-view").classList.remove("hidden");
 };
 
 window.cerrarPago = function () {
     document.getElementById("pago-view").classList.add("hidden");
     document.getElementById("efectivo-box").classList.add("hidden");
-    document.getElementById("pos-view").classList.remove("hidden");
 };
 
-window.pagarTarjeta = function () {
-    registrarVenta("Tarjeta", 0);
-};
+async function registrarVenta(metodo, vuelto = 0) {
+    const total = Number(document.getElementById("total-label").textContent);
 
-window.pagarQR = function () {
-    registrarVenta("QR", 0);
-};
+    const venta = {
+        fecha: Date.now(),
+        metodo,
+        total,
+        vuelto,
+        items: carrito
+    };
 
-window.pagarTransferencia = function () {
-    registrarVenta("Transferencia", 0);
-};
+    await addDoc(collection(db, "ventas"), venta);
+
+    carrito = [];
+    actualizarCarrito();
+
+    mostrarTicket(venta);
+}
+
+window.pagarTarjeta = () => registrarVenta("Tarjeta");
+window.pagarQR = () => registrarVenta("QR");
+window.pagarTransferencia = () => registrarVenta("Transferencia");
 
 window.pagarEfectivo = function () {
     document.getElementById("efectivo-box").classList.remove("hidden");
@@ -1049,111 +436,125 @@ window.confirmarEfectivo = function () {
     const entregado = Number(document.getElementById("monto-entregado").value);
 
     if (entregado < total) {
-        alert("El monto entregado es insuficiente.");
+        alert("Monto insuficiente");
         return;
     }
 
     const vuelto = entregado - total;
-
-    document.getElementById("vuelto-label").textContent =
-        "Vuelto: $" + vuelto.toFixed(2);
+    document.getElementById("vuelto-label").textContent = "Vuelto: $" + vuelto.toFixed(2);
 
     registrarVenta("Efectivo", vuelto);
 };
 
 /* ============================
-   REGISTRAR VENTA
-============================ */
-async function registrarVenta(metodo, vuelto) {
-    const total = Number(document.getElementById("total-label").textContent);
-
-    await addDoc(collection(db, "ventas"), {
-        fecha: new Date().toISOString(),
-        empleado: empleadoActual,
-        metodo,
-        vuelto,
-        total,
-        items: carrito
-    });
-
-    await descontarStock(carrito);
-
-    mostrarTicket(metodo, vuelto);
-
-    carrito = [];
-    renderCarrito();
-}
-
-/* ============================
-   DESCONTAR STOCK
-============================ */
-async function descontarStock(items) {
-    for (const item of items) {
-        const q = query(
-            collection(db, "productos"),
-            where("codigo", "==", item.codigo)
-        );
-
-        const snap = await getDocs(q);
-
-        if (!snap.empty) {
-            const ref = snap.docs[0].ref;
-            const data = snap.docs[0].data();
-
-            const nuevoStock = (data.stock || 0) - item.cantidad;
-
-            await updateDoc(ref, { stock: nuevoStock });
-        }
-    }
-}
-
-/* ============================
    TICKET
 ============================ */
-function mostrarTicket(metodo, vuelto) {
+function mostrarTicket(v) {
     document.getElementById("ticket-items").innerHTML = "";
 
-    carrito.forEach(item => {
+    v.items.forEach(i => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-            <td>${item.nombre}</td>
-            <td>${item.cantidad}</td>
-            <td>${(item.cantidad * item.precio).toFixed(2)}</td>
+            <td>${i.nombre}</td>
+            <td>${i.cantidad}</td>
+            <td>${(i.precio * i.cantidad).toFixed(2)}</td>
         `;
         document.getElementById("ticket-items").appendChild(tr);
     });
 
-    document.getElementById("ticket-total").textContent =
-        document.getElementById("total-label").textContent;
+    document.getElementById("ticket-total").textContent = v.total.toFixed(2);
+    document.getElementById("ticket-fecha").textContent = new Date(v.fecha).toLocaleString();
+    document.getElementById("ticket-metodo").textContent = "Método: " + v.metodo;
+    document.getElementById("ticket-vuelto").textContent = v.vuelto ? "Vuelto: $" + v.vuelto.toFixed(2) : "";
 
-    document.getElementById("ticket-fecha").textContent =
-        "Fecha: " + new Date().toLocaleString();
-
-    document.getElementById("ticket-empleado").textContent =
-        "Empleado: " + empleadoActual;
-
-    document.getElementById("ticket-metodo").textContent =
-        "Método: " + metodo;
-
-    if (metodo === "Efectivo") {
-        document.getElementById("ticket-vuelto").textContent =
-            "Vuelto: $" + vuelto.toFixed(2);
-    } else {
-        document.getElementById("ticket-vuelto").textContent = "";
-    }
-
-    const total = document.getElementById("total-label").textContent;
-    const qrData = `CANOCCHI FULL STORE\nTotal: $${total}\nMétodo: ${metodo}`;
-    document.getElementById("ticket-qr").src =
-        "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" +
-        encodeURIComponent(qrData);
-
-    document.getElementById("pago-view").classList.add("hidden");
     document.getElementById("ticket-view").classList.remove("hidden");
 }
 
 window.cerrarTicket = function () {
     document.getElementById("ticket-view").classList.add("hidden");
+};
+/* ============================
+   DASHBOARD
+============================ */
+window.abrirDashboard = async function () {
+    const snap = await getDocs(collection(db, "ventas"));
+
+    let hoy = 0;
+    let mes = 0;
+    let contador = {};
+
+    const ahora = new Date();
+    const diaHoy = ahora.toLocaleDateString();
+    const mesActual = ahora.getMonth();
+
+    snap.forEach(doc => {
+        const v = doc.data();
+        const fecha = new Date(v.fecha);
+
+        if (fecha.toLocaleDateString() === diaHoy) hoy += v.total;
+        if (fecha.getMonth() === mesActual) mes += v.total;
+
+        v.items.forEach(i => {
+            if (!contador[i.nombre]) contador[i.nombre] = 0;
+            contador[i.nombre] += i.cantidad;
+        });
+    });
+
+    const topProducto = Object.keys(contador).length
+        ? Object.entries(contador).sort((a, b) => b[1] - a[1])[0][0]
+        : "N/A";
+
+    document.getElementById("dash-hoy").textContent = hoy.toFixed(2);
+    document.getElementById("dash-mes").textContent = mes.toFixed(2);
+    document.getElementById("dash-top").textContent = topProducto;
+
+    document.getElementById("pos-view").classList.add("hidden");
+    document.getElementById("dashboard-view").classList.remove("hidden");
+};
+
+window.cerrarDashboard = function () {
+    document.getElementById("dashboard-view").classList.add("hidden");
+    document.getElementById("pos-view").classList.remove("hidden");
+};
+
+/* ============================
+   HISTORIAL
+============================ */
+window.abrirHistorial = async function () {
+    const snap = await getDocs(collection(db, "ventas"));
+    const tbody = document.getElementById("historial-body");
+    tbody.innerHTML = "";
+
+    snap.forEach(doc => {
+        const v = doc.data();
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${new Date(v.fecha).toLocaleString()}</td>
+            <td>${v.metodo}</td>
+            <td>${v.total.toFixed(2)}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    document.getElementById("pos-view").classList.add("hidden");
+    document.getElementById("historial-view").classList.remove("hidden");
+};
+
+window.cerrarHistorial = function () {
+    document.getElementById("historial-view").classList.add("hidden");
+    document.getElementById("pos-view").classList.remove("hidden");
+};
+
+/* ============================
+   ADMIN
+============================ */
+window.abrirAdmin = function () {
+    document.getElementById("pos-view").classList.add("hidden");
+    document.getElementById("admin-view").classList.remove("hidden");
+};
+
+window.cerrarAdmin = function () {
+    document.getElementById("admin-view").classList.add("hidden");
     document.getElementById("pos-view").classList.remove("hidden");
 };
 
@@ -1165,7 +566,6 @@ window.abrirCierreCaja = async function () {
 
     let total = 0;
     let cantidad = 0;
-
     let tarjeta = 0;
     let qr = 0;
     let efectivo = 0;
@@ -1173,35 +573,29 @@ window.abrirCierreCaja = async function () {
 
     snap.forEach(doc => {
         const v = doc.data();
-        const fecha = new Date(v.fecha);
-        const hoy = new Date();
+        total += v.total;
+        cantidad++;
 
-        if (fecha.toDateString() === hoy.toDateString()) {
-            total += v.total;
-            cantidad++;
-
-            if (v.metodo === "Tarjeta") tarjeta += v.total;
-            if (v.metodo === "QR") qr += v.total;
-            if (v.metodo === "Efectivo") efectivo += v.total;
-            if (v.metodo === "Transferencia") transferencia += v.total;
-        }
+        if (v.metodo === "Tarjeta") tarjeta += v.total;
+        if (v.metodo === "QR") qr += v.total;
+        if (v.metodo === "Efectivo") efectivo += v.total;
+        if (v.metodo === "Transferencia") transferencia += v.total;
     });
 
     document.getElementById("cierre-total").textContent = total.toFixed(2);
     document.getElementById("cierre-cantidad").textContent = cantidad;
-
     document.getElementById("cierre-tarjeta").textContent = tarjeta.toFixed(2);
     document.getElementById("cierre-qr").textContent = qr.toFixed(2);
     document.getElementById("cierre-efectivo").textContent = efectivo.toFixed(2);
     document.getElementById("cierre-transferencia").textContent = transferencia.toFixed(2);
 
-    document.getElementById("pos-view").classList.add("hidden");
+    document.getElementById("admin-view").classList.add("hidden");
     document.getElementById("cierre-view").classList.remove("hidden");
 };
 
 window.cerrarCierreCaja = function () {
     document.getElementById("cierre-view").classList.add("hidden");
-    document.getElementById("pos-view").classList.remove("hidden");
+    document.getElementById("admin-view").classList.remove("hidden");
 };
 
 window.imprimirCierre = function () {
@@ -1209,49 +603,12 @@ window.imprimirCierre = function () {
 };
 
 /* ============================
-   DASHBOARD
+   TEMA OSCURO
 ============================ */
-window.abrirDashboard = async function () {
-    const snap = await getDocs(collection(db, "ventas"));
+window.toggleTema = function () {
+    document.body.classList.toggle("dark-mode");
+};
 
-    let totalHoy = 0;
-    let totalMes = 0;
-
-    const contadorProductos = {};
-
-    const hoy = new Date();
-    const mesActual = hoy.getMonth();
-
-    snap.forEach(doc => {
-        const v = doc.data();
-        const fecha = new Date(v.fecha);
-
-        if (fecha.toDateString() === hoy.toDateString()) {
-            totalHoy += v.total;
-        }
-
-        if (fecha.getMonth() === mesActual) {
-            totalMes += v.total;
-        }
-
-        v.items.forEach(item => {
-            if (!contadorProductos[item.nombre]) contadorProductos[item.nombre] = 0;
-            contadorProductos[item.nombre] += item.cantidad;
-        });
-    });
-
-    let topProducto = "Sin ventas";
-    let maxCant = 0;
-
-    for (const p in contadorProductos) {
-        if (contadorProductos[p] > maxCant) {
-            maxCant = contadorProductos[p];
-            topProducto = p;
-        }
-    }
-
-    document.getElementById("dash-hoy").textContent = "$" + totalHoy.toFixed(2);
-    document.getElementById("dash-mes").textContent = "$" + totalMes.toFixed(2);
-    document.getElementById("dash-top").textContent = topProducto;
-
-    document.getElementById("pos
+</script>
+</body>
+</html>
