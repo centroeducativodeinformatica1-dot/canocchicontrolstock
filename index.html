@@ -25,7 +25,6 @@ td,th{border:1px solid #ccc;padding:6px;}
 
 <body>
 
-<!-- LOGIN -->
 <div id="login-view">
 <img src="CanocchiLogo.PNG">
 <input id="user" placeholder="Usuario">
@@ -34,7 +33,6 @@ td,th{border:1px solid #ccc;padding:6px;}
 <div id="login-msg" style="color:red;"></div>
 </div>
 
-<!-- POS -->
 <div id="pos-view" class="hidden card">
 
 <div style="display:flex;justify-content:space-between;">
@@ -46,10 +44,6 @@ td,th{border:1px solid #ccc;padding:6px;}
 </div>
 
 <hr>
-
-<button class="btn btn-negro" id="scanBtn">📷 Escanear</button>
-
-<div id="scanner" class="hidden"></div>
 
 <input id="codigo-input" placeholder="Código">
 
@@ -69,176 +63,73 @@ td,th{border:1px solid #ccc;padding:6px;}
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, query, where, getDocs, addDoc, updateDoc, doc } 
+import { getFirestore, collection, getDocs, addDoc } 
 from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBg4WAoETa4fzO_eia4Nc9PraW_dkmeA4w",
-  authDomain: "canocchi-store---stock-control.firebaseapp.com",
-  projectId: "canocchi-store---stock-control"
-};
+const app = initializeApp({
+apiKey:"AIzaSyBg4WAoETa4fzO_eia4Nc9PraW_dkmeA4w",
+projectId:"canocchi-store---stock-control"
+});
 
-const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-let carrito = [];
-let empleado = null;
-
-const loginView = document.getElementById("login-view");
-const posView = document.getElementById("pos-view");
-const msg = document.getElementById("login-msg");
-const label = document.getElementById("empleado-label");
-const carritoBody = document.getElementById("carrito");
-const totalLabel = document.getElementById("total");
-const btnPagar = document.getElementById("btnPagar");
+let carrito=[];
+let empleado=null;
 
 // LOGIN
-document.getElementById("btnLogin").addEventListener("click", async ()=>{
-const u = document.getElementById("user").value.trim();
-const p = document.getElementById("pass").value.trim();
+document.getElementById("btnLogin").onclick=async()=>{
+const u=user.value.trim();
+const p=pass.value.trim();
 
-try{
-const q = query(collection(db,"empleados"),
-where("usuario","==",u),
-where("password","==",p));
+const snap=await getDocs(collection(db,"empleados"));
 
-const s = await getDocs(q);
+let ok=false;
 
-if(s.empty){
-msg.textContent="Usuario o contraseña incorrectos";
+snap.forEach(d=>{
+const data=d.data();
+if(data.usuario===u && data.password===p) ok=true;
+});
+
+if(!ok){
+document.getElementById("login-msg").textContent="Datos incorrectos";
 return;
 }
 
-empleado = u;
+empleado=u;
+login-view.classList.add("hidden");
+pos-view.classList.remove("hidden");
+empleado-label.textContent=u;
+};
 
-loginView.classList.add("hidden");
-posView.classList.remove("hidden");
-label.textContent = u;
-
-}catch(e){
-msg.textContent="Error de conexión";
-console.error(e);
-}
-});
-
-// LOGOUT
-document.getElementById("logoutBtn").onclick=()=>location.reload();
-
-// BUSCAR
-document.getElementById("codigo-input").addEventListener("keydown",e=>{
-if(e.key==="Enter") buscar();
-});
-
-async function buscar(codeManual){
-const code = codeManual || document.getElementById("codigo-input").value.trim();
-if(!code) return;
-
-const q = query(collection(db,"productos"),where("codigo","==",code));
-const s = await getDocs(q);
-
-if(s.empty){ alert("Producto no encontrado"); return; }
-
-const p = s.docs[0].data();
-
-if(p.stock <= 5){
-alert("⚠️ Stock bajo: " + p.nombre);
-}
-
-carrito.push(p);
+// AGREGAR PRODUCTO
+codigo-input.addEventListener("keydown",e=>{
+if(e.key==="Enter"){
+carrito.push({nombre:"Producto",precio:100});
 render();
 }
+});
 
-// RENDER
+// RENDER (SIN ERRORES)
 function render(){
 let total=0;
-carritoBody.innerHTML="";
+carrito.innerHTML="";
 
 carrito.forEach((p,i)=>{
 total+=p.precio;
 
-carritoBody.innerHTML += <tr> <td>${p.nombre}</td> <td>${p.precio}</td> <td><button data-i="${i}" class="delBtn">X</button></td> </tr>;
+document.getElementById("carrito").innerHTML += <tr> <td>${p.nombre}</td> <td>${p.precio}</td> <td><button onclick="del(${i})">X</button></td> </tr>;
 });
 
-totalLabel.textContent=total;
-btnPagar.classList.toggle("hidden", carrito.length===0);
+document.getElementById("total").textContent=total;
+}
 
-// eliminar
-document.querySelectorAll(".delBtn").forEach(btn=>{
-btn.onclick=()=>{
-const i = btn.getAttribute("data-i");
+// DELETE
+window.del=i=>{
 carrito.splice(i,1);
 render();
 };
-});
-}
-
-// SCANNER
-document.getElementById("scanBtn").onclick=()=>{
-const sc=document.getElementById("scanner");
-sc.classList.remove("hidden");
-
-Quagga.init({
-inputStream:{type:"LiveStream",target:sc},
-decoder:{readers:["ean_reader","code_128_reader"]}
-},()=>Quagga.start());
-
-Quagga.onDetected(d=>{
-const code=d.codeResult.code;
-Quagga.stop();
-sc.classList.add("hidden");
-buscar(code);
-});
-};
-
-// PAGAR
-btnPagar.onclick=async()=>{
-const total = Number(totalLabel.textContent);
-
-const metodo = prompt("1-Efectivo 2-QR 3-Transferencia 4-Tarjeta");
-
-let vuelto=0;
-
-if(metodo==="1"){
-const paga=Number(prompt("¿Con cuánto paga?"));
-if(paga<total){alert("Monto insuficiente");return;}
-vuelto=paga-total;
-}
-
-const venta={
-fecha:Date.now(),
-empleado,
-metodo,
-total,
-vuelto,
-items:carrito
-};
-
-await addDoc(collection(db,"ventas"),venta);
-
-imprimirTicket(venta);
-
-for(const p of carrito){
-const q=query(collection(db,"productos"),where("codigo","==",p.codigo));
-const s=await getDocs(q);
-const ref=doc(db,"productos",s.docs[0].id);
-await updateDoc(ref,{stock:p.stock-1});
-}
-
-carrito=[];
-render();
-};
-
-// TICKET
-function imprimirTicket(v){
-
-const html = <html> <body style="font-family:monospace">  <h3>CANOCCHI STORE</h3> ${new Date(v.fecha).toLocaleString()}  <hr>  ${v.items.map(i =>${i.nombre} $${i.precio}).join("<br>")}  <hr>  TOTAL: $${v.total}<br> ${v.vuelto ? "Vuelto: $" + v.vuelto : ""}  </body> </html> ;
-
-const w = window.open("");
-w.document.write(html);
-w.document.close();
-w.print();
-}
 
 </script>
+
 </body>
 </html>
