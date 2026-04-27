@@ -1,3 +1,4 @@
+}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -13,8 +14,9 @@ body{font-family:Arial;background:#f5f5f5;margin:0;}
 #login-view{text-align:center;margin-top:60px;}
 #login-view img{width:170px;margin-bottom:20px;}
 input{width:100%;padding:10px;margin:6px 0;border-radius:6px;border:1px solid #ccc;}
-.btn-rojo{background:#E53935;color:#fff;border:none;padding:10px;border-radius:6px;cursor:pointer;}
-.btn-negro{background:#000;color:#fff;border:none;padding:10px;border-radius:6px;cursor:pointer;}
+.btn{padding:10px;border:none;border-radius:6px;cursor:pointer;}
+.btn-rojo{background:#E53935;color:#fff;}
+.btn-negro{background:#000;color:#fff;}
 .card{background:#fff;padding:15px;border-radius:8px;max-width:900px;margin:15px auto;}
 table{width:100%;border-collapse:collapse;}
 td,th{border:1px solid #ccc;padding:6px;}
@@ -29,7 +31,7 @@ td,th{border:1px solid #ccc;padding:6px;}
 <img src="CanocchiLogo.PNG">
 <input id="user" placeholder="Usuario">
 <input id="pass" type="password" placeholder="Contraseña">
-<button class="btn-rojo" id="btnLogin">Ingresar</button>
+<button class="btn btn-rojo" id="btnLogin">Ingresar</button>
 <div id="login-msg" style="color:red;"></div>
 </div>
 
@@ -40,34 +42,34 @@ td,th{border:1px solid #ccc;padding:6px;}
 <h2>Canocchi POS</h2>
 <div>
 <span id="empleado-label"></span>
-<button class="btn-rojo" id="logoutBtn">Salir</button>
+<button class="btn btn-rojo" id="logoutBtn">Salir</button>
 </div>
 </div>
 
 <hr>
 
-<button class="btn-negro" id="scanBtn">📷 Escanear</button>
+<button class="btn btn-negro" id="scanBtn">📷 Escanear</button>
 
 <div id="scanner" class="hidden"></div>
 
-<input id="codigo-input" placeholder="Código" />
+<input id="codigo-input" placeholder="Código">
 
 <table>
 <thead>
-<tr><th>Nombre</th><th>Precio</th><th></th></tr>
+<tr><th>Producto</th><th>Precio</th><th></th></tr>
 </thead>
 <tbody id="carrito"></tbody>
 </table>
 
 <h3 style="text-align:right;">Total: $<span id="total">0</span></h3>
 
-<button class="btn-rojo hidden" id="btnPagar">Pagar</button>
+<button class="btn btn-rojo hidden" id="btnPagar">Pagar</button>
 
 </div>
 
 <script type="module">
 
-// 🔥 FIREBASE (TU CONFIG)
+// FIREBASE
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, query, where, getDocs, addDoc, updateDoc, doc } 
 from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -76,10 +78,6 @@ const firebaseConfig = {
   apiKey: "AIzaSyBg4WAoETa4fzO_eia4Nc9PraW_dkmeA4w",
   authDomain: "canocchi-store---stock-control.firebaseapp.com",
   projectId: "canocchi-store---stock-control",
-  storageBucket: "canocchi-store---stock-control.firebasestorage.app",
-  messagingSenderId: "1062366040495",
-  appId: "1:1062366040495:web:2afb9007cc568d11fa1f5a",
-  measurementId: "G-9EB87X6949"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -88,7 +86,6 @@ const db = getFirestore(app);
 // VARIABLES
 let carrito = [];
 let empleado = null;
-let scanning = false;
 
 // ELEMENTOS
 const loginView = document.getElementById("login-view");
@@ -104,19 +101,28 @@ document.getElementById("btnLogin").addEventListener("click", async ()=>{
 const u = document.getElementById("user").value.trim();
 const p = document.getElementById("pass").value.trim();
 
+try{
 const q = query(collection(db,"empleados"),
 where("usuario","==",u),
 where("password","==",p));
 
 const s = await getDocs(q);
 
-if(s.empty){ msg.textContent="Datos incorrectos"; return; }
+if(s.empty){
+msg.textContent="Usuario o contraseña incorrectos";
+return;
+}
 
 empleado = u;
 
 loginView.classList.add("hidden");
 posView.classList.remove("hidden");
 label.textContent = u;
+
+}catch(e){
+msg.textContent="Error conexión";
+console.error(e);
+}
 });
 
 // LOGOUT
@@ -134,9 +140,14 @@ if(!code) return;
 const q = query(collection(db,"productos"),where("codigo","==",code));
 const s = await getDocs(q);
 
-if(s.empty){ alert("No existe"); return; }
+if(s.empty){ alert("Producto no encontrado"); return; }
 
 const p = s.docs[0].data();
+
+// alerta stock bajo
+if(p.stock <= 5){
+alert("⚠️ Stock bajo: " + p.nombre);
+}
 
 carrito.push(p);
 render();
@@ -144,30 +155,28 @@ render();
 
 // RENDER
 function render(){
-let t=0;
+let total=0;
 carritoBody.innerHTML="";
 
 carrito.forEach((p,i)=>{
-t+=p.precio;
+total+=p.precio;
 
 carritoBody.innerHTML+= <tr> <td>${p.nombre}</td> <td>${p.precio}</td> <td><button onclick="eliminar(${i})">X</button></td> </tr>;
 });
 
-totalLabel.textContent=t;
-
-// mostrar botón pagar
+totalLabel.textContent=total;
 btnPagar.classList.toggle("hidden", carrito.length===0);
 }
 
-// ELIMINAR
-window.eliminar = (i)=>{
+// eliminar
+window.eliminar=(i)=>{
 carrito.splice(i,1);
 render();
 };
 
 // SCANNER
 document.getElementById("scanBtn").onclick=()=>{
-const sc = document.getElementById("scanner");
+const sc=document.getElementById("scanner");
 sc.classList.remove("hidden");
 
 Quagga.init({
@@ -176,64 +185,69 @@ decoder:{readers:["ean_reader","code_128_reader"]}
 },()=>Quagga.start());
 
 Quagga.onDetected(d=>{
-if(scanning) return;
-scanning=true;
-
-const code = d.codeResult.code;
-
+const code=d.codeResult.code;
 Quagga.stop();
 sc.classList.add("hidden");
-
 buscar(code);
 });
 };
 
 // PAGAR
-btnPagar.onclick = async ()=>{
-
+btnPagar.onclick=async()=>{
 const total = Number(totalLabel.textContent);
 
 const metodo = prompt("1-Efectivo 2-QR 3-Transferencia 4-Tarjeta");
 
-let vuelto = 0;
+let vuelto=0;
 
 if(metodo==="1"){
-const paga = Number(prompt("¿Con cuánto paga?"));
+const paga=Number(prompt("¿Con cuánto paga?"));
 if(paga<total){alert("Monto insuficiente");return;}
-vuelto = paga - total;
-alert("Vuelto: $" + vuelto);
-}
-
-let metodoTxt = {
-"1":"Efectivo",
-"2":"QR",
-"3":"Transferencia",
-"4":"Tarjeta"
-}[metodo] || "Otro";
-
-// actualizar stock
-for(const p of carrito){
-const q = query(collection(db,"productos"),where("codigo","==",p.codigo));
-const s = await getDocs(q);
-const ref = doc(db,"productos",s.docs[0].id);
-await updateDoc(ref,{stock:p.stock-1});
+vuelto=paga-total;
 }
 
 // guardar venta
-await addDoc(collection(db,"ventas"),{
+const venta={
 fecha:Date.now(),
 empleado,
-metodo:metodoTxt,
+metodo,
 total,
 vuelto,
 items:carrito
-});
+};
+
+await addDoc(collection(db,"ventas"),venta);
+
+// ticket
+imprimirTicket(venta);
+
+// actualizar stock
+for(const p of carrito){
+const q=query(collection(db,"productos"),where("codigo","==",p.codigo));
+const s=await getDocs(q);
+const ref=doc(db,"productos",s.docs[0].id);
+await updateDoc(ref,{stock:p.stock-1});
+}
 
 carrito=[];
 render();
-
-alert("Venta registrada");
 };
+
+// TICKET
+function imprimirTicket(v){
+
+let html=<html><body style="font-family:monospace"> <h3>CANOCCHI STORE</h3> ${new Date(v.fecha).toLocaleString()} <hr>;
+
+v.items.forEach(i=>{
+html+=${i.nombre} $${i.precio}<br>;
+});
+
+html+=<hr> TOTAL: $${v.total}<br> ${v.vuelto ? "Vuelto: $"+v.vuelto : ""} </body></html>;
+
+const w=window.open("");
+w.document.write(html);
+w.print();
+}
 
 </script>
 </body>
