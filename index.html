@@ -1,144 +1,756 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<title>Canocchi POS</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Canocchi Store — POS System</title>
 
-<style>
-body{font-family:Arial;background:#f5f5f5;margin:0;}
-.hidden{display:none;}
-#login-view{text-align:center;margin-top:60px;}
-#login-view img{width:170px;margin-bottom:20px;}
-input{width:100%;padding:10px;margin:6px 0;border-radius:6px;border:1px solid #ccc;}
-button{padding:10px;border:none;border-radius:6px;cursor:pointer;}
-.btn-rojo{background:#E53935;color:#fff;}
-.card{background:#fff;padding:15px;border-radius:8px;max-width:900px;margin:15px auto;}
-table{width:100%;border-collapse:collapse;}
-td,th{border:1px solid #ccc;padding:6px;}
-</style>
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50:  '#fff1f1',
+              100: '#ffe0e0',
+              200: '#ffc5c5',
+              300: '#ff9b9b',
+              400: '#ff6060',
+              500: '#f83030',
+              600: '#e51111',
+              700: '#c10a0a',
+              800: '#a00c0c',
+              900: '#840f0f',
+            },
+            surface: {
+              900: '#f8f8f8',
+              800: '#ffffff',
+              700: '#f1f1f1',
+              600: '#e5e5e5',
+              500: '#d0d0d0',
+              400: '#9ca3af',
+            },
+          },
+          fontFamily: {
+            display: ['"Exo 2"', 'sans-serif'],
+            body:    ['"DM Sans"', 'sans-serif'],
+            mono:    ['"JetBrains Mono"', 'monospace'],
+          },
+          boxShadow: {
+            'glow-blue': '0 0 24px rgba(225,17,17,0.18)',
+            'glow-sm':   '0 0 10px rgba(225,17,17,0.12)',
+          },
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;600;700;900&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+
+  <!-- html5-qrcode -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+  <!-- qrcode.js para el ticket -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <!-- SheetJS para exportar Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <!-- Custom styles -->
+  <link rel="stylesheet" href="styles.css" />
 </head>
 
-<body>
+<body class="bg-surface-900 text-gray-800 font-body min-h-screen">
 
-<!-- LOGIN -->
-<div id="login-view">
-<img src="CanocchiLogo.PNG">
-<input id="user" placeholder="Usuario">
-<input id="pass" type="password" placeholder="Contraseña">
-<button class="btn-rojo" id="btnLogin">Ingresar</button>
-<div id="login-msg" style="color:red;"></div>
+<!-- ══════════════════════════════════════════════
+     PANTALLA DE LOGIN
+══════════════════════════════════════════════ -->
+<div id="loginScreen" class="fixed inset-0 flex items-center justify-center z-50 bg-surface-900">
+  <div class="login-card relative w-full max-w-md mx-4 p-8 rounded-2xl border border-surface-600 bg-surface-800 shadow-glow-blue">
+
+    <!-- Logo / Brand -->
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center justify-center w-24 h-24 rounded-2xl bg-white border-2 border-brand-200 shadow-glow-blue mb-4 overflow-hidden">
+        <img src="logo.png" alt="Logo" class="w-full h-full object-contain p-1"
+             onerror="this.parentElement.innerHTML='<svg class=\'w-10 h-10 text-brand-600\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z\'/></svg>'" />
+      </div>
+      <h1 class="font-display text-3xl font-900 tracking-tight text-gray-800">Canocchi Store</h1>
+      <p class="text-surface-400 text-sm mt-1 font-mono">Stock and Pricing System V2.2.2.6</p>
+    </div>
+
+    <!-- Form -->
+    <div class="space-y-4">
+      <div>
+        <label class="block text-xs font-600 text-brand-600 uppercase tracking-widest mb-1.5">Email</label>
+        <input id="loginEmail" type="email" placeholder="usuario@canocchi.com"
+          class="w-full bg-white border border-surface-500 rounded-xl px-4 py-3 text-gray-800 placeholder-surface-400
+                 focus:outline-none focus:border-brand-500 focus:shadow-glow-sm transition-all duration-200" />
+      </div>
+      <div>
+        <label class="block text-xs font-600 text-brand-600 uppercase tracking-widest mb-1.5">Contraseña</label>
+        <input id="loginPass" type="password" placeholder="••••••••"
+          class="w-full bg-white border border-surface-500 rounded-xl px-4 py-3 text-gray-800 placeholder-surface-400
+                 focus:outline-none focus:border-brand-500 focus:shadow-glow-sm transition-all duration-200" />
+      </div>
+      <button id="btnLogin"
+        class="w-full mt-2 bg-brand-600 hover:bg-brand-500 text-white font-display font-700 py-3.5 rounded-xl
+               transition-all duration-200 shadow-glow-blue hover:shadow-glow-blue active:scale-95 tracking-wide">
+        INGRESAR AL SISTEMA
+      </button>
+      <p id="loginError" class="text-red-500 text-sm text-center hidden"></p>
+    </div>
+  </div>
 </div>
 
-<!-- POS -->
-<div id="pos-view" class="hidden card">
+<!-- ══════════════════════════════════════════════
+     APP PRINCIPAL (hidden until login)
+══════════════════════════════════════════════ -->
+<div id="appShell" class="hidden min-h-screen flex flex-col">
 
-<div style="display:flex;justify-content:space-between;">
-<h2>Canocchi POS</h2>
-<div>
-<span id="empleado-label"></span>
-<button class="btn-rojo" id="logoutBtn">Salir</button>
+  <!-- ── TOP NAVBAR ── -->
+  <header class="sticky top-0 z-40 bg-white border-b border-surface-600 px-4 py-3 shadow-sm">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-white border-2 border-brand-200 flex items-center justify-center overflow-hidden shadow-glow-sm">
+          <img src="logo.png" alt="Logo" class="w-full h-full object-contain p-0.5"
+               onerror="this.parentElement.innerHTML='<span class=\'text-lg\'>🛒</span>'" />
+        </div>
+        <span class="font-display font-700 text-lg tracking-tight text-gray-800">Canocchi <span class="text-brand-600">POS</span></span>
+      </div>
+
+      <!-- Nav Pills -->
+      <nav class="hidden md:flex items-center gap-1 bg-surface-700 rounded-xl p-1">
+        <button data-tab="pos"       class="nav-btn active-nav px-4 py-1.5 rounded-lg text-sm font-600 transition-all flex items-center gap-2">
+          <img src="nav-venta.png" alt="" class="w-5 h-5 object-contain" onerror="this.style.display='none'" /><span>Venta</span>
+        </button>
+        <button data-tab="stock"     class="nav-btn px-4 py-1.5 rounded-lg text-sm font-600 transition-all flex items-center gap-2">
+          <img src="nav-stock.png" alt="" class="w-5 h-5 object-contain" onerror="this.style.display='none'" /><span>Stock</span>
+        </button>
+        <button data-tab="dashboard" class="nav-btn px-4 py-1.5 rounded-lg text-sm font-600 transition-all flex items-center gap-2">
+          <img src="nav-dashboard.png" alt="" class="w-5 h-5 object-contain" onerror="this.style.display='none'" /><span>Dashboard</span>
+        </button>
+        <button data-tab="cierre"    class="nav-btn px-4 py-1.5 rounded-lg text-sm font-600 transition-all flex items-center gap-2">
+          <img src="nav-cierre.png" alt="" class="w-5 h-5 object-contain" onerror="this.style.display='none'" /><span>Cierre</span>
+        </button>
+      </nav>
+
+      <div class="flex items-center gap-3">
+        <span id="userEmail" class="hidden md:block text-xs text-surface-400 font-mono"></span>
+        <button id="btnLogout"
+          class="text-xs bg-surface-700 hover:bg-surface-600 border border-surface-500 text-gray-600 hover:text-gray-800 px-3 py-1.5 rounded-lg transition-all">
+          Salir
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Mobile bottom nav -->
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-surface-600 flex shadow-lg">
+    <button data-tab="pos"       class="mob-nav flex-1 py-3 flex flex-col items-center gap-0.5 text-xs active-mob-nav">
+      <img src="nav-venta.png" alt="" class="w-6 h-6 object-contain" onerror="this.outerHTML='<span class=\'text-lg\'>🛒</span>'" /><span>Venta</span>
+    </button>
+    <button data-tab="stock"     class="mob-nav flex-1 py-3 flex flex-col items-center gap-0.5 text-xs">
+      <img src="nav-stock.png" alt="" class="w-6 h-6 object-contain" onerror="this.outerHTML='<span class=\'text-lg\'>📦</span>'" /><span>Stock</span>
+    </button>
+    <button data-tab="dashboard" class="mob-nav flex-1 py-3 flex flex-col items-center gap-0.5 text-xs">
+      <img src="nav-dashboard.png" alt="" class="w-6 h-6 object-contain" onerror="this.outerHTML='<span class=\'text-lg\'>📊</span>'" /><span>Stats</span>
+    </button>
+    <button data-tab="cierre"    class="mob-nav flex-1 py-3 flex flex-col items-center gap-0.5 text-xs">
+      <img src="nav-cierre.png" alt="" class="w-6 h-6 object-contain" onerror="this.outerHTML='<span class=\'text-lg\'>💼</span>'" /><span>Cierre</span>
+    </button>
+  </nav>
+
+  <!-- ══ MAIN CONTENT ══ -->
+  <main class="flex-1 max-w-7xl mx-auto w-full px-3 py-4 pb-24 md:pb-6">
+
+    <!-- ─────────────────────────────────
+         TAB: POS (Venta)
+    ───────────────────────────────── -->
+    <div id="tab-pos" class="tab-content">
+      <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+
+        <!-- LEFT: Scanner + búsqueda manual -->
+        <div class="lg:col-span-3 space-y-4">
+
+          <!-- Scanner Card -->
+          <div class="card">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="section-title">📷 Escáner de Código</h2>
+              <div class="flex gap-2">
+                <button id="btnStartScan"
+                  class="btn-primary text-xs px-3 py-1.5">
+                  Activar Cámara
+                </button>
+                <button id="btnStopScan"
+                  class="btn-ghost text-xs px-3 py-1.5 hidden">
+                  Detener
+                </button>
+              </div>
+            </div>
+
+            <div id="qr-reader" class="rounded-xl overflow-hidden bg-surface-700 min-h-[200px] flex items-center justify-center">
+              <div class="text-center text-surface-400 p-8">
+                <img src="scanner-placeholder.png" alt="Escáner" class="w-24 h-24 mx-auto mb-3 object-contain opacity-70"
+                     onerror="this.style.display='none'" />
+                <p class="text-sm">Presioná "Activar Cámara" para escanear</p>
+                <p class="text-xs mt-1 opacity-60">O ingresá el código manualmente abajo</p>
+              </div>
+            </div>
+
+            <!-- Manual barcode input (also handles USB laser scanners) -->
+            <div class="mt-3 flex gap-2">
+              <input id="manualBarcode" type="text" placeholder="Código de barras (Enter para buscar)"
+                class="flex-1 bg-white border border-surface-500 rounded-xl px-4 py-2.5 text-gray-800
+                       placeholder-surface-400 focus:outline-none focus:border-brand-500 transition-all font-mono text-sm" />
+              <button id="btnSearchBarcode" class="btn-primary px-4">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+              </button>
+            </div>
+            <p id="scanStatus" class="text-xs mt-2 text-center font-mono text-brand-400 min-h-[16px]"></p>
+          </div>
+
+          <!-- Búsqueda por nombre -->
+          <div class="card">
+            <h2 class="section-title mb-3">🔍 Buscar Producto</h2>
+            <input id="searchProduct" type="text" placeholder="Nombre, marca o sección..."
+              class="w-full bg-white border border-surface-500 rounded-xl px-4 py-2.5 text-gray-800
+                     placeholder-surface-400 focus:outline-none focus:border-brand-500 transition-all" />
+            <div id="searchResults" class="mt-2 space-y-2 max-h-64 overflow-y-auto custom-scroll"></div>
+          </div>
+        </div>
+
+        <!-- RIGHT: Carrito -->
+        <div class="lg:col-span-2 space-y-4">
+          <div class="card h-full flex flex-col">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="section-title">🛒 Carrito</h2>
+              <button id="btnClearCart" class="text-xs text-red-400 hover:text-red-300 transition-colors">
+                Vaciar
+              </button>
+            </div>
+
+            <!-- Items del carrito -->
+            <div id="cartItems" class="flex-1 space-y-2 overflow-y-auto max-h-96 custom-scroll pr-1">
+              <div class="text-center text-surface-400 py-10">
+                <p class="text-4xl mb-2">🛒</p>
+                <p class="text-sm">El carrito está vacío</p>
+              </div>
+            </div>
+
+            <!-- Totales -->
+            <div class="mt-4 pt-4 border-t border-surface-600 space-y-2">
+              <div class="flex justify-between text-sm text-gray-500">
+                <span>Subtotal</span>
+                <span id="cartSubtotal">$0.00</span>
+              </div>
+              <div class="flex justify-between text-sm text-gray-500">
+                <span>Ítems</span>
+                <span id="cartCount">0</span>
+              </div>
+              <div class="flex justify-between text-xl font-display font-700 text-gray-800 pt-2 border-t border-surface-600">
+                <span>TOTAL</span>
+                <span id="cartTotal" class="text-brand-600">$0.00</span>
+              </div>
+              <button id="btnPagar"
+                class="w-full mt-2 btn-primary py-4 text-lg font-display font-700 tracking-wide disabled:opacity-40
+                       disabled:cursor-not-allowed" disabled>
+                💳 PROCESAR PAGO
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─────────────────────────────────
+         TAB: STOCK
+    ───────────────────────────────── -->
+    <div id="tab-stock" class="tab-content hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        <!-- Formulario alta producto -->
+        <div class="card">
+          <h2 class="section-title mb-4">➕ Nuevo Producto</h2>
+          <div class="space-y-3">
+
+            <!-- Código de barras con opción de escaneo -->
+            <div>
+              <label class="field-label">Código de Barras *</label>
+              <div class="flex gap-2">
+                <input id="prodBarcode" type="text" placeholder="7790001234567 (o escaneá 📷)"
+                  class="field-input font-mono flex-1" />
+                <button id="btnStockScan" title="Escanear con cámara"
+                  class="btn-ghost px-3 text-lg flex-shrink-0" type="button">📷</button>
+              </div>
+              <div id="stock-qr-reader-wrap" class="hidden mt-2">
+                <div id="stock-qr-reader" class="rounded-xl overflow-hidden bg-surface-700 min-h-[180px]"></div>
+                <div class="flex items-center justify-between mt-1 px-1">
+                  <p id="stockScanStatus" class="text-xs font-mono text-brand-400 min-h-[14px]"></p>
+                  <button id="btnStockStopScan" class="text-xs text-red-400 hover:text-red-300 transition-colors" type="button">✕ Cerrar cámara</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="field-label">Nombre *</label>
+                <input id="prodName" type="text" placeholder="Nombre del producto"
+                  class="field-input" />
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="field-label">Sección</label>
+                <input id="prodSection" type="text" placeholder="Electrónica, Ropa..."
+                  class="field-input" />
+              </div>
+              <div>
+                <label class="field-label">Marca</label>
+                <input id="prodBrand" type="text" placeholder="Marca"
+                  class="field-input" />
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="field-label">Precio ($) *</label>
+                <input id="prodPrice" type="number" step="0.01" placeholder="0.00"
+                  class="field-input font-mono" />
+              </div>
+              <div>
+                <label class="field-label">Stock Inicial *</label>
+                <input id="prodStock" type="number" placeholder="0"
+                  class="field-input font-mono" />
+              </div>
+            </div>
+            <!-- Flags especiales -->
+            <div class="grid grid-cols-2 gap-3">
+              <label class="flex items-center gap-2 cursor-pointer select-none bg-orange-50 border border-orange-200 rounded-xl px-3 py-2.5 hover:border-orange-400 transition-all">
+                <input id="prodIsCigarrillo" type="checkbox" class="w-4 h-4 accent-orange-500 cursor-pointer" />
+                <span class="text-sm text-orange-700 font-medium">🚬 Es cigarrillo</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer select-none bg-blue-50 border border-blue-200 rounded-xl px-3 py-2.5 hover:border-blue-400 transition-all">
+                <input id="prodIsScale" type="checkbox" class="w-4 h-4 accent-blue-500 cursor-pointer" />
+                <span class="text-sm text-blue-700 font-medium">⚖️ Balanza/Fiambre</span>
+              </label>
+            </div>
+            <button id="btnAddProduct" class="btn-primary w-full py-3 font-display font-700 mt-2">
+              GUARDAR PRODUCTO
+            </button>
+            <p id="stockMsg" class="text-sm text-center min-h-[18px] font-mono"></p>
+          </div>
+        </div>
+
+        <!-- Lista de stock -->
+        <div class="card">
+          <div class="flex items-center justify-between mb-4 gap-2 flex-wrap">
+            <h2 class="section-title">📦 Inventario</h2>
+            <div class="flex items-center gap-2">
+              <input id="filterStock" type="text" placeholder="Filtrar..."
+                class="bg-white border border-surface-500 rounded-lg px-3 py-1.5 text-sm text-gray-800
+                       placeholder-surface-400 focus:outline-none focus:border-brand-500 transition-all w-32" />
+              <button id="btnExportExcel" title="Exportar a Excel"
+                class="btn-ghost px-3 py-1.5 text-sm flex items-center gap-1.5 flex-shrink-0">
+                <img src="excel-icon.png" alt="Excel" class="w-5 h-5 object-contain"
+                     onerror="this.outerHTML='📊'" />
+                <span class="hidden sm:inline">Exportar</span>
+              </button>
+              <!-- Importar Excel -->
+              <button id="btnImportExcel" title="Importar desde Excel"
+                class="btn-primary px-3 py-1.5 text-sm flex items-center gap-1.5 flex-shrink-0">
+                ⬆️ <span class="hidden sm:inline">Importar</span>
+              </button>
+              <input type="file" id="importExcelInput" accept=".xlsx,.xls" class="hidden" />
+            </div>
+          </div>
+          <div id="stockList" class="space-y-2 max-h-[500px] overflow-y-auto custom-scroll pr-1">
+            <p class="text-surface-400 text-sm text-center py-8">Cargando inventario...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─────────────────────────────────
+         TAB: DASHBOARD
+    ───────────────────────────────── -->
+    <div id="tab-dashboard" class="tab-content hidden">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="stat-card">
+          <p class="stat-label">Ventas Hoy</p>
+          <p id="statSalesToday" class="stat-value">$0</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-label">Transacciones Hoy</p>
+          <p id="statTxToday" class="stat-value">0</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-label">Ticket Promedio</p>
+          <p id="statAvgTicket" class="stat-value">$0</p>
+        </div>
+        <div class="stat-card border-orange-200 bg-orange-50">
+          <p class="stat-label text-orange-600">🚬 Cigarrillos Hoy</p>
+          <p id="statCigarrillos" class="stat-value text-orange-600">$0</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <!-- Top 5 productos -->
+        <div class="card">
+          <h2 class="section-title mb-4">🏆 Top 5 Productos Más Vendidos</h2>
+          <div id="rankingList" class="space-y-3">
+            <p class="text-surface-400 text-sm text-center py-8">Cargando ranking...</p>
+          </div>
+        </div>
+
+        <!-- Métodos de pago -->
+        <div class="card">
+          <h2 class="section-title mb-4">💳 Ventas por Método de Pago</h2>
+          <div id="paymentBreakdown" class="space-y-3">
+            <p class="text-surface-400 text-sm text-center py-8">Sin datos aún</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4 text-right">
+        <button id="btnRefreshDashboard" class="btn-ghost text-sm px-4 py-2">
+          🔄 Actualizar datos
+        </button>
+      </div>
+    </div>
+
+    <!-- ─────────────────────────────────
+         TAB: CIERRE DE CAJA
+    ───────────────────────────────── -->
+    <div id="tab-cierre" class="tab-content hidden">
+      <div class="max-w-2xl mx-auto">
+        <div class="card">
+          <h2 class="section-title mb-2">💼 Cierre de Caja</h2>
+          <p class="text-surface-400 text-sm mb-6">Generá el resumen del día y guardalo en el historial.</p>
+
+          <div id="cierrePreview" class="bg-gray-50 rounded-xl p-4 mb-4 space-y-3 font-mono text-sm border border-gray-200">
+            <div class="flex justify-between border-b border-gray-200 pb-2 mb-3">
+              <span class="text-brand-600 font-semibold">RESUMEN DEL DÍA</span>
+              <span id="cierreFecha" class="text-gray-600"></span>
+            </div>
+            <div class="flex justify-between"><span class="text-gray-500">Total Ventas:</span><span id="cTotal" class="text-gray-800 font-bold">$0.00</span></div>
+            <div class="flex justify-between"><span class="text-gray-500">N° Transacciones:</span><span id="cTx" class="text-gray-800 font-bold">0</span></div>
+            <div class="flex justify-between"><span class="text-gray-500">Efectivo:</span><span id="cEfectivo" class="text-green-700 font-bold">$0.00</span></div>
+            <div class="flex justify-between"><span class="text-gray-500">Débito/Crédito:</span><span id="cTarjeta" class="text-blue-700 font-bold">$0.00</span></div>
+            <div class="flex justify-between"><span class="text-gray-500">Transferencia:</span><span id="cTransferencia" class="text-purple-700 font-bold">$0.00</span></div>
+            <div class="flex justify-between"><span class="text-gray-500">QR/MP:</span><span id="cQR" class="text-yellow-700 font-bold">$0.00</span></div>
+            <div class="flex justify-between border-t border-orange-200 pt-2 mt-1">
+              <span class="text-orange-600 font-semibold">🚬 Total Cigarrillos:</span>
+              <span id="cCigarrillos" class="text-orange-600 font-bold">$0.00</span>
+            </div>
+          </div>
+
+          <!-- Caja Fuerte: ingreso manual -->
+          <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-4">
+            <h3 class="text-sm font-semibold text-indigo-700 mb-3">🏦 Caja Fuerte — Conteo Manual</h3>
+            <p class="text-xs text-indigo-500 mb-3">Ingresá el monto físico contado en la caja fuerte al cierre del día.</p>
+            <div class="flex items-center gap-3">
+              <span class="text-indigo-600 font-mono font-semibold text-sm flex-shrink-0">$</span>
+              <input id="inputCajaFuerte" type="number" step="0.01" placeholder="0.00"
+                class="flex-1 bg-white border border-indigo-300 rounded-xl px-4 py-2.5 text-gray-800
+                       placeholder-indigo-200 focus:outline-none focus:border-indigo-500 transition-all font-mono text-lg" />
+            </div>
+          </div>
+
+          <div class="flex gap-3">
+            <button id="btnCalcularCierre" class="btn-ghost flex-1 py-3">
+              🔄 Calcular
+            </button>
+            <button id="btnGuardarCierre" class="btn-primary flex-1 py-3 font-display font-700">
+              💾 GUARDAR CIERRE
+            </button>
+          </div>
+          <p id="cierreMsg" class="text-sm text-center mt-3 min-h-[18px] font-mono"></p>
+        </div>
+
+        <!-- Historial cierres -->
+        <div class="card mt-4">
+          <h2 class="section-title mb-4">📋 Historial de Cierres</h2>
+          <div id="cierreHistorial" class="space-y-2 max-h-80 overflow-y-auto custom-scroll">
+            <p class="text-surface-400 text-sm text-center py-6">Sin cierres registrados</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
 </div>
+
+<!-- ══════════════════════════════════════════════
+     MODAL: MÉTODO DE PAGO
+══════════════════════════════════════════════ -->
+<div id="modalPago" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+  <div class="bg-white border border-surface-600 rounded-2xl w-full max-w-md shadow-glow-blue">
+    <div class="p-6">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="font-display font-700 text-xl text-gray-800">Método de Pago</h3>
+        <button id="closeModalPago" class="text-surface-400 hover:text-gray-700 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Total a pagar -->
+      <div class="bg-brand-600 rounded-xl p-4 mb-6 text-center">
+        <p class="text-brand-100 text-sm">TOTAL A COBRAR</p>
+        <p id="modalTotal" class="font-display font-900 text-4xl text-white mt-1">$0.00</p>
+      </div>
+
+      <!-- Opciones de pago -->
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <button data-method="efectivo"
+          class="pay-method-btn flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-surface-500
+                 hover:border-brand-500 hover:bg-brand-50 transition-all text-gray-700">
+          <img src="pay-efectivo.png" alt="Efectivo" class="w-12 h-12 object-contain"
+               onerror="this.outerHTML='<span class=\'text-3xl\'>💵</span>'" />
+          <span class="font-600 text-sm">Efectivo</span>
+        </button>
+        <button data-method="debito_credito"
+          class="pay-method-btn flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-surface-500
+                 hover:border-brand-500 hover:bg-brand-50 transition-all text-gray-700">
+          <img src="pay-debito.png" alt="Débito / Crédito" class="w-12 h-12 object-contain"
+               onerror="this.outerHTML='<span class=\'text-3xl\'>💳</span>'" />
+          <span class="font-600 text-sm">Débito / Crédito</span>
+        </button>
+        <button data-method="transferencia"
+          class="pay-method-btn flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-surface-500
+                 hover:border-brand-500 hover:bg-brand-50 transition-all text-gray-700">
+          <img src="pay-transferencia.png" alt="Transferencia" class="w-12 h-12 object-contain"
+               onerror="this.outerHTML='<span class=\'text-3xl\'>🏦</span>'" />
+          <span class="font-600 text-sm">Transferencia</span>
+        </button>
+        <button data-method="qr"
+          class="pay-method-btn flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-surface-500
+                 hover:border-brand-500 hover:bg-brand-50 transition-all text-gray-700">
+          <img src="pay-qr.png" alt="QR / MercadoPago" class="w-12 h-12 object-contain"
+               onerror="this.outerHTML='<span class=\'text-3xl\'>📱</span>'" />
+          <span class="font-600 text-sm">QR / MercadoPago</span>
+        </button>
+      </div>
+
+      <!-- QR de cobro -->
+      <div id="qrPagoContainer" class="hidden mb-4">
+        <div class="bg-white rounded-xl p-4 border border-surface-600 flex items-center justify-center min-h-[200px]">
+          <div class="text-center text-gray-500">
+            <div class="w-40 h-40 border-4 border-dashed border-gray-300 rounded-lg flex items-center justify-center mx-auto mb-2">
+              <span class="text-5xl">📷</span>
+            </div>
+            <p class="text-sm font-semibold">Tu QR de cobro va aquí</p>
+            <p class="text-xs">Reemplazá este div con tu imagen</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Efectivo -->
+      <div id="efectivoInput" class="hidden mb-4">
+        <label class="field-label">Monto recibido ($)</label>
+        <input id="montoEfectivo" type="number" step="0.01" placeholder="0.00"
+          class="field-input font-mono text-lg" />
+        <div class="flex justify-between mt-2 text-sm">
+          <span class="text-surface-400">Vuelto:</span>
+          <span id="vuelto" class="font-mono font-600 text-green-600">$0.00</span>
+        </div>
+      </div>
+
+      <button id="btnConfirmarPago"
+        class="w-full btn-primary py-4 font-display font-700 text-lg disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+        ✅ CONFIRMAR VENTA
+      </button>
+    </div>
+  </div>
 </div>
 
-<hr>
-
-<input id="codigo-input" placeholder="Agregar producto (Enter)">
-
-<table>
-<thead>
-<tr>
-<th>Producto</th>
-<th>Precio</th>
-<th></th>
-</tr>
-</thead>
-<tbody id="carrito-body"></tbody>
-</table>
-
-<h3 style="text-align:right;">Total: $<span id="total">0</span></h3>
-
+<!-- ══════════════════════════════════════════════
+     MODAL: TICKET / RECIBO
+══════════════════════════════════════════════ -->
+<div id="modalTicket" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+  <div class="bg-white border border-surface-600 rounded-2xl w-full max-w-sm shadow-glow-blue">
+    <div class="p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-display font-700 text-xl text-gray-800">✅ Venta Confirmada</h3>
+        <button id="closeModalTicket" class="text-surface-400 hover:text-gray-700">✕</button>
+      </div>
+      <div id="ticketContent" class="bg-white text-gray-900 rounded-xl p-4 font-mono text-xs mb-4 border border-surface-600"></div>
+      <div id="ticketQR" class="flex justify-center my-3 bg-white rounded-xl p-3 border border-surface-600"></div>
+      <div class="flex gap-3 mt-4">
+        <button id="btnPrintTicket" class="btn-ghost flex-1 py-3">🖨️ Imprimir</button>
+        <button id="btnShareWhatsapp"
+          class="flex-1 py-3 rounded-xl font-display font-700 text-white transition-all border-none cursor-pointer flex items-center justify-center gap-2"
+          style="background:#25d366">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+            <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.112 1.523 5.84L.057 23.885a.5.5 0 00.612.612l6.098-1.456A11.94 11.94 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.8 9.8 0 01-5.003-1.371l-.36-.214-3.724.889.903-3.648-.235-.374A9.818 9.818 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182S21.818 6.57 21.818 12 17.43 21.818 12 21.818z"/>
+          </svg>
+          WhatsApp
+        </button>
+        <button id="btnNuevaVenta" class="btn-primary flex-1 py-3 font-display font-700">🛒 Nueva Venta</button>
+      </div>
+    </div>
+  </div>
 </div>
 
-<script>
+<!-- Toast notifications -->
+<div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2 pointer-events-none"></div>
 
-// VARIABLES
-let carrito = [];
-let empleado = null;
+<!-- ══════════════════════════════════════════════
+     MODAL: ALTA RÁPIDA DE PRODUCTO (código no encontrado)
+══════════════════════════════════════════════ -->
+<div id="modalQuickAdd" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+  <div class="bg-white border border-brand-300 rounded-2xl w-full max-w-md shadow-glow-blue">
+    <div class="p-6">
+      <div class="flex items-start justify-between mb-4">
+        <div>
+          <h3 class="font-display font-700 text-xl text-gray-800">Producto no encontrado</h3>
+          <p class="text-surface-400 text-sm mt-0.5">Completá los datos para darlo de alta ahora</p>
+        </div>
+        <button id="closeModalQuickAdd" class="text-surface-400 hover:text-gray-700 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="bg-brand-50 border border-brand-200 rounded-xl px-4 py-2.5 mb-4 flex items-center gap-3">
+        <span class="text-2xl">📦</span>
+        <div>
+          <p class="text-xs text-brand-600 font-600 uppercase tracking-widest">Código escaneado</p>
+          <p id="qaBarcodeDisplay" class="font-mono font-700 text-gray-800 text-base"></p>
+          <input type="hidden" id="qaBarcode" />
+        </div>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="field-label">Nombre del producto *</label>
+          <input id="qaName" type="text" placeholder="Ej: Gaseosa Cola 500ml" class="field-input" autocomplete="off" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="field-label">Sección</label>
+            <input id="qaSection" type="text" placeholder="Bebidas, Ropa..." class="field-input" />
+          </div>
+          <div>
+            <label class="field-label">Marca</label>
+            <input id="qaBrand" type="text" placeholder="Marca..." class="field-input" />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="field-label">Precio ($) *</label>
+            <input id="qaPrice" type="number" step="0.01" placeholder="0.00" class="field-input font-mono" />
+          </div>
+          <div>
+            <label class="field-label">Stock inicial *</label>
+            <input id="qaStock" type="number" placeholder="1" class="field-input font-mono" />
+          </div>
+        </div>
+        <label class="flex items-center gap-3 cursor-pointer select-none bg-surface-700 rounded-xl px-4 py-3
+                      border border-surface-500 hover:border-brand-400 transition-all text-gray-700">
+          <input id="qaAddToCart" type="checkbox" checked class="w-4 h-4 accent-red-500 cursor-pointer" />
+          <span class="text-sm">Agregar al carrito luego de guardar</span>
+        </label>
+        <label class="flex items-center gap-3 cursor-pointer select-none bg-orange-50 rounded-xl px-4 py-3
+                      border border-orange-200 hover:border-orange-400 transition-all text-orange-700">
+          <input id="qaIsCigarrillo" type="checkbox" class="w-4 h-4 accent-orange-500 cursor-pointer" />
+          <span class="text-sm font-medium">🚬 Es cigarrillo (se contabiliza por separado)</span>
+        </label>
+        <p id="qaMsg" class="text-xs font-mono text-center min-h-[16px]"></p>
+        <div class="flex gap-3 pt-1">
+          <button onclick="document.getElementById('closeModalQuickAdd').click()"
+            class="btn-ghost flex-1 py-3 text-sm">Cancelar</button>
+          <button id="btnSaveQuickAdd" class="btn-primary flex-1 py-3 font-display font-700">
+            💾 GUARDAR PRODUCTO
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
-// LOGIN
-document.getElementById("btnLogin").addEventListener("click", function(){
 
-const u = document.getElementById("user").value.trim();
-const p = document.getElementById("pass").value.trim();
+<!-- ══════════════════════════════════════════════
+     MODAL: IMPORTAR EXCEL
+══════════════════════════════════════════════ -->
+<div id="modalImport" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+  <div class="bg-white border border-surface-600 rounded-2xl w-full max-w-lg shadow-glow-blue">
+    <div class="p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-display font-700 text-xl text-gray-800">📥 Importar Inventario</h3>
+        <button id="closeModalImport" class="text-surface-400 hover:text-gray-700 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
 
-// LOGIN SIMPLE (sin Firebase para evitar errores)
-if(u === "admin" && p === "1234"){
+      <!-- Info columnas requeridas -->
+      <div class="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-4 text-xs text-blue-800 space-y-1">
+        <p class="font-semibold">📋 El archivo debe tener estas columnas (igual que la plantilla):</p>
+        <p class="font-mono">Código de Barras · Nombre · Sección · Marca · Precio ($) · Stock</p>
+        <p class="mt-1 text-blue-600">Si el producto ya existe se actualizará. Si no existe, se creará.</p>
+      </div>
 
-empleado = u;
+      <!-- Zona de selección de archivo -->
+      <input type="file" id="importExcelInput" accept=".xlsx,.xls" class="hidden" />
+      <div id="importDropZone"
+        class="border-2 border-dashed border-surface-500 rounded-xl p-6 mb-4 text-center cursor-pointer
+               hover:border-brand-500 hover:bg-brand-50 transition-all"
+        onclick="document.getElementById('importExcelInput').click()">
+        <p class="text-3xl mb-2">📂</p>
+        <p class="text-sm font-semibold text-gray-700">Hacé click para seleccionar tu archivo Excel</p>
+        <p class="text-xs text-gray-400 mt-1">Formatos aceptados: .xlsx, .xls</p>
+      </div>
 
-document.getElementById("login-view").classList.add("hidden");
-document.getElementById("pos-view").classList.remove("hidden");
-document.getElementById("empleado-label").textContent = u;
+      <!-- Nombre del archivo seleccionado -->
+      <div id="importFileName" class="flex items-center gap-2 text-sm text-gray-600 font-mono bg-gray-50
+           border border-gray-200 rounded-xl px-4 py-2.5 mb-4 hidden">
+        <span class="text-lg">📄</span>
+        <span id="importFileNameText" class="truncate flex-1"></span>
+        <button onclick="document.getElementById('importExcelInput').click()"
+          class="text-xs text-brand-600 hover:text-brand-700 font-semibold flex-shrink-0">Cambiar</button>
+      </div>
 
-}else{
-document.getElementById("login-msg").textContent = "Usuario o contraseña incorrectos";
-}
+      <!-- Preview tabla -->
+      <div id="importPreviewWrap" class="hidden mb-4">
+        <p class="text-xs font-semibold text-gray-600 mb-2" id="importPreviewCount"></p>
+        <div class="max-h-52 overflow-y-auto custom-scroll rounded-xl border border-surface-600">
+          <table class="w-full text-xs">
+            <thead class="bg-gray-50 sticky top-0">
+              <tr class="text-left text-gray-500">
+                <th class="px-3 py-2">Código</th>
+                <th class="px-3 py-2">Nombre</th>
+                <th class="px-3 py-2 text-right">Precio</th>
+                <th class="px-3 py-2 text-right">Stock</th>
+              </tr>
+            </thead>
+            <tbody id="importPreviewBody" class="divide-y divide-gray-100"></tbody>
+          </table>
+        </div>
+        <p id="importErrorMsg" class="text-xs text-red-500 font-mono mt-2 hidden"></p>
+      </div>
 
-});
+      <div class="flex gap-3 pt-1">
+        <button id="btnCancelImport" class="btn-ghost flex-1 py-3 text-sm">Cancelar</button>
+        <button id="btnConfirmImport" class="btn-primary flex-1 py-3 font-display font-700 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+          ✅ IMPORTAR AL SISTEMA
+        </button>
+      </div>
+      <p id="importProgress" class="text-xs text-center font-mono mt-3 min-h-[16px] text-gray-500"></p>
+    </div>
+  </div>
+</div>
 
-// LOGOUT
-document.getElementById("logoutBtn").addEventListener("click", function(){
-location.reload();
-});
-
-// AGREGAR PRODUCTO
-document.getElementById("codigo-input").addEventListener("keydown", function(e){
-if(e.key === "Enter"){
-agregarProducto();
-}
-});
-
-function agregarProducto(){
-
-const producto = {
-nombre: "Producto",
-precio: 1000
-};
-
-carrito.push(producto);
-render();
-
-}
-
-// RENDER
-function render(){
-
-let total = 0;
-const tbody = document.getElementById("carrito-body");
-tbody.innerHTML = "";
-
-carrito.forEach(function(item, index){
-
-total += item.precio;
-
-const fila = <tr> <td>${item.nombre}</td> <td>${item.precio}</td> <td><button onclick="eliminarItem(${index})">X</button></td> </tr>;
-
-tbody.innerHTML += fila;
-
-});
-
-document.getElementById("total").textContent = total;
-
-}
-
-// ELIMINAR
-function eliminarItem(index){
-carrito.splice(index,1);
-render();
-}
-
-</script>
+<!-- Firebase & App Scripts -->
+<script type="module" src="app.js"></script>
 
 </body>
 </html>
