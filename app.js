@@ -39,6 +39,35 @@ let stockHtml5QrCode   = null; // stock tab scanner instance
 let stockScannerActive = false;
 let lastScannedCode    = '';   // debounce: evitar doble escaneo del mismo código
 let scanCooldown       = false;
+let torchOn            = false; // linterna estado
+let currentCamTrack    = null;  // track de la cámara activa para torch
+
+// ── Beep on scan ─────────────────────────────────────
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1200, ctx.currentTime);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.12);
+    setTimeout(() => ctx.close(), 300);
+  } catch (_) {}
+}
+
+// ── Dark mode ─────────────────────────────────────────
+(function initDarkMode() {
+  const saved = localStorage.getItem('canocchi_dark');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  if (saved === 'dark' || (!saved && prefersDark)) {
+    document.documentElement.classList.add('dark');
+  }
+})();
 
 // ════════════════════════════════════════════════════
 //   UTILITIES
@@ -110,6 +139,16 @@ document.getElementById('btnLogout').addEventListener('click', async () => {
   await signOut(auth);
 });
 
+// ── Dark mode toggle ──────────────────────────────────
+document.getElementById('btnDarkMode').addEventListener('click', () => {
+  const isDark = document.documentElement.classList.toggle('dark');
+  localStorage.setItem('canocchi_dark', isDark ? 'dark' : 'light');
+  const sun  = document.getElementById('iconSun');
+  const moon = document.getElementById('iconMoon');
+  if (sun)  sun.classList.toggle('hidden', !isDark);
+  if (moon) moon.classList.toggle('hidden', isDark);
+});
+
 onAuthStateChanged(auth, (user) => {
   if (user) {
     document.getElementById('loginScreen').classList.add('hidden');
@@ -139,9 +178,10 @@ function switchTab(tabId) {
 
   if (tabId !== 'pos')   stopScanner();
   if (tabId !== 'stock') stopStockScanner();
-  if (tabId === 'dashboard') loadDashboard();
-  if (tabId === 'cierre')    loadCierreHistorial();
-  if (tabId === 'stock')     loadStockList();
+  if (tabId === 'dashboard')  loadDashboard();
+  if (tabId === 'cierre')     loadCierreHistorial();
+  if (tabId === 'stock')      loadStockList();
+  if (tabId === 'cajafuerte') loadCajaFuerteHistorial();
 }
 
 document.querySelectorAll('.nav-btn, .mob-nav').forEach(btn => {
@@ -193,10 +233,40 @@ async function startScanner() {
 
       await html5QrCode.start(
         cam.id,
-        { fps: 10, qrbox: { width: 250, height: 150 }, aspectRatio: 1.5 },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 150 },
+          aspectRatio: 1.5,
+          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+        },
         onScanSuccess,
         () => {}  // silence errors
       );
+
+      // Grab the video track for torch control + apply continuous focus
+      try {
+        await new Promise(r => setTimeout(r, 800)); // esperar que el stream esté estable
+        const videoEl = document.querySelector('#qr-reader video');
+        if (videoEl && videoEl.srcObject) {
+          const tracks = videoEl.srcObject.getVideoTracks();
+          if (tracks.length) {
+            currentCamTrack = tracks[0];
+            const caps = currentCamTrack.getCapabilities?.() || {};
+
+            // Aplicar enfoque continuo si el dispositivo lo soporta
+            if (caps.focusMode && caps.focusMode.includes('continuous')) {
+              await currentCamTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+            }
+
+            // Mostrar botón de linterna si el dispositivo la soporta
+            if (caps.torch) {
+              document.getElementById('btnTorch').classList.remove('hidden');
+              document.getElementById('btnTorch').classList.add('flex');
+            }
+          }
+        }
+      } catch(_) {}
+
       scannerActive = true;
       document.getElementById('btnStartScan').classList.add('hidden');
       document.getElementById('btnStopScan').classList.remove('hidden');
@@ -231,12 +301,17 @@ async function stopScanner() {
   } catch (_) {}
   scannerActive = false;
   html5QrCode   = null;
+  currentCamTrack = null;
+  torchOn = false;
+  document.getElementById('btnTorch').classList.add('hidden');
+  document.getElementById('btnTorch').classList.remove('flex');
+  document.getElementById('torchLabel').textContent = 'Linterna';
   document.getElementById('btnStartScan').classList.remove('hidden');
   document.getElementById('btnStopScan').classList.add('hidden');
   document.getElementById('scanStatus').textContent = '';
   document.getElementById('qr-reader').innerHTML = `
     <div class="text-center text-[#475569] p-8">
-      <img src="scanner-placeholder.png" alt="Escáner" class="w-24 h-24 mx-auto mb-3 object-contain opacity-70" onerror="this.style.display='none'" />
+      <svg class="w-20 h-20 mx-auto mb-3 opacity-40 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 9V5a2 2 0 012-2h4M3 15v4a2 2 0 002 2h4m6-18h4a2 2 0 012 2v4m0 6v4a2 2 0 01-2 2h-4M9 9h6v6H9z"/></svg>
       <p class="text-sm">Presioná "Activar Cámara" para escanear</p>
     </div>`;
 }
@@ -249,18 +324,34 @@ async function onScanSuccess(code) {
   lastScannedCode = code;
   setTimeout(() => { scanCooldown = false; lastScannedCode = ''; }, 2500);
 
-  document.getElementById('scanStatus').textContent = `📦 Buscando: ${code}…`;
+  playBeep();
+  document.getElementById('scanStatus').textContent = `Buscando: ${code}…`;
   await addProductToCartByBarcode(code);
 }
 
 document.getElementById('btnStartScan').addEventListener('click', startScanner);
 document.getElementById('btnStopScan').addEventListener('click', stopScanner);
 
+// Torch (linterna) toggle
+document.getElementById('btnTorch').addEventListener('click', async () => {
+  if (!currentCamTrack) return;
+  try {
+    torchOn = !torchOn;
+    await currentCamTrack.applyConstraints({ advanced: [{ torch: torchOn }] });
+    document.getElementById('torchLabel').textContent = torchOn ? 'Apagar' : 'Linterna';
+    document.getElementById('btnTorch').style.color = torchOn ? '#f59e0b' : '';
+  } catch(e) {
+    toast('Linterna no disponible en este dispositivo', 'info');
+    torchOn = false;
+  }
+});
+
 // Manual / laser scanner input
 const manualBarcodeInput = document.getElementById('manualBarcode');
 document.getElementById('btnSearchBarcode').addEventListener('click', async () => {
   const code = manualBarcodeInput.value.trim();
   if (!code) return;
+  playBeep();
   await addProductToCartByBarcode(code);
   manualBarcodeInput.value = '';
   manualBarcodeInput.focus();
@@ -269,6 +360,7 @@ manualBarcodeInput.addEventListener('keydown', async (e) => {
   if (e.key === 'Enter') {
     const code = manualBarcodeInput.value.trim();
     if (!code) return;
+    playBeep();
     await addProductToCartByBarcode(code);
     manualBarcodeInput.value = '';
   }
@@ -296,13 +388,17 @@ function decodeScaleBarcode(barcode) {
   // Prefijos 20-29 = peso variable (estándar GS1 Argentina)
   if (prefix < 20 || prefix > 29) return null;
 
-  // Los dígitos 2-6 (5 dígitos) = código interno del producto
-  // Los dígitos 7-11 (5 dígitos) = precio en centavos (últimos 2 = decimales)
-  const productCode    = barcode.substring(0, 7);   // clave en Firestore
-  const priceRaw       = parseInt(barcode.substring(7, 12));
-  const embeddedPrice  = priceRaw / 100;             // ej: 01250 → $12.50
+  // Formato balanza Argentina (ej: 2007010012403):
+  // Dígitos 0-1  (2 dígitos) = prefijo (20-29)
+  // Dígitos 2-6  (5 dígitos) = código PLU del producto (ej: 07010)
+  // Dígitos 7-11 (5 dígitos) = peso en gramos x1000 (ej: 01240 = 1.240 kg)
+  // Dígito  12   = dígito de control
+  const productCode = barcode.substring(0, 7);  // ej: 2007010 (prefijo + PLU)
+  const weightRaw   = parseInt(barcode.substring(7, 12)); // ej: 01240
+  const weightKg    = weightRaw / 1000;                   // ej: 1.240 kg
+  const weightG     = weightRaw;                          // ej: 1240 g
 
-  return { productCode, embeddedPrice };
+  return { productCode, weightKg, weightG, fullBarcode: barcode };
 }
 
 async function addProductToCartByBarcode(barcode) {
@@ -316,29 +412,17 @@ async function addProductToCartByBarcode(barcode) {
       const docSnap = await getDoc(docRef);
 
       if (!docSnap.exists()) {
-        // Producto de balanza no registrado → alta con código base
         await stopScanner();
         document.getElementById('scanStatus').textContent = `⚠️ Fiambre ${scaleData.productCode} no registrado`;
-        openQuickAddModal(scaleData.productCode);
+        openScaleAddModal(scaleData);
         return;
       }
 
       const baseProduct = { id: scaleData.productCode, ...docSnap.data() };
-      // Usamos el precio del ticket de la balanza, NO el precio fijo
-      const product = {
-        ...baseProduct,
-        id:    barcode,            // ID único por ticket (incluye precio)
-        price: scaleData.embeddedPrice,
-        _isScale: true,            // flag para saber que es balanza
-        _baseId:  scaleData.productCode,
-      };
+      const pricePerKg  = baseProduct.pricePerKg || baseProduct.price || 0;
 
-      // Para balanza: agregar directamente sin control de stock numérico
-      addScaleProductToCart(product);
-      document.getElementById('scanStatus').textContent =
-        `⚖️ ${baseProduct.name} — ${fmt(scaleData.embeddedPrice)}`;
-      setTimeout(() => { document.getElementById('scanStatus').textContent = '📡 Listo para escanear'; }, 2000);
-      refocusBarcode();
+      // Abrir modal para que el cajero ingrese el peso manualmente
+      openScaleWeightModal(baseProduct, pricePerKg, barcode);
       return;
     }
 
@@ -369,8 +453,168 @@ function addScaleProductToCart(product) {
   // Cada escaneo de balanza es un ítem independiente (precio diferente cada vez)
   cart.push({ ...product, quantity: 1, stock: 9999 });
   renderCart();
-  toast(`⚖️ ${product.name} — ${fmt(product.price)}`, 'success');
+  toast(`⚖️ ${product.name} — ${product._weightKg.toFixed(3)} kg = ${fmt(product.price)}`, 'success');
 }
+
+// ── Scale Weight Modal (ingreso manual de peso) ───────────────────────────
+let _pendingScaleBase    = null;
+let _pendingScalePriceKg = 0;
+let _pendingScaleBarcode = '';
+
+function openScaleWeightModal(baseProduct, pricePerKg, barcode) {
+  _pendingScaleBase    = baseProduct;
+  _pendingScalePriceKg = pricePerKg;
+  _pendingScaleBarcode = barcode;
+
+  document.getElementById('swName').textContent       = baseProduct.name;
+  document.getElementById('swPricePerKg').textContent = fmt(pricePerKg) + ' /kg';
+  document.getElementById('swImporte').textContent    = '—';
+  document.getElementById('swWeightInput').value      = '';
+  document.getElementById('swMsg').textContent        = '';
+
+  openModal('modalScaleWeight');
+  setTimeout(() => document.getElementById('swWeightInput').focus(), 100);
+}
+
+document.getElementById('swWeightInput').addEventListener('input', () => {
+  const g  = parseFloat(document.getElementById('swWeightInput').value) || 0;
+  const kg = g / 1000;
+  const importe = Math.round(_pendingScalePriceKg * kg * 100) / 100;
+  document.getElementById('swImporte').textContent = g > 0 ? fmt(importe) : '—';
+});
+
+document.getElementById('btnScaleWeightConfirm').addEventListener('click', () => {
+  const g = parseFloat(document.getElementById('swWeightInput').value);
+  if (!g || g <= 0) {
+    document.getElementById('swMsg').textContent = '⚠️ Ingresá el peso en gramos';
+    return;
+  }
+  const kg = g / 1000;
+  const importe = Math.round(_pendingScalePriceKg * kg * 100) / 100;
+  const product = {
+    ..._pendingScaleBase,
+    id:          _pendingScaleBarcode + '_' + Date.now(),
+    price:       importe,
+    _isScale:    true,
+    _baseId:     _pendingScaleBase.id,
+    _weightKg:   kg,
+    _weightG:    g,
+    _pricePerKg: _pendingScalePriceKg,
+  };
+  closeModal('modalScaleWeight');
+  addScaleProductToCart(product);
+  document.getElementById('scanStatus').textContent =
+    `Balanza: ${_pendingScaleBase.name} — ${g}g = ${fmt(importe)}`;
+  setTimeout(() => { document.getElementById('scanStatus').textContent = 'Listo para escanear'; }, 3000);
+  refocusBarcode();
+  _pendingScaleBase = null;
+});
+
+document.getElementById('btnScaleWeightCancel').addEventListener('click', () => {
+  closeModal('modalScaleWeight');
+  _pendingScaleBase = null;
+  refocusBarcode();
+});
+
+// Enter en el campo de peso confirma
+document.getElementById('swWeightInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('btnScaleWeightConfirm').click();
+});
+
+// ── Scale Add Modal (alta de producto de balanza no registrado) ──────────
+function openScaleAddModal(scaleData) {
+  document.getElementById('saProductCode').value       = scaleData.productCode;
+  document.getElementById('saWeightKg').value          = scaleData.weightKg.toFixed(3);
+  document.getElementById('saWeightG').value           = scaleData.weightG;
+  document.getElementById('saFullBarcode').value       = scaleData.fullBarcode || '';
+  document.getElementById('saName').value              = '';
+  document.getElementById('saPricePerKg').value        = '';
+  document.getElementById('saMsg').textContent         = '';
+
+  // Mostrar info detectada
+  document.getElementById('saWeightDisplay').textContent = `${scaleData.weightKg.toFixed(3)} kg (${scaleData.weightG} g)`;
+  document.getElementById('saCodeDisplay').textContent   = scaleData.productCode;
+  document.getElementById('saImporteDisplay').textContent = '—';
+
+  openModal('modalScaleAdd');
+  setTimeout(() => document.getElementById('saName').focus(), 100);
+}
+
+document.getElementById('saPricePerKg').addEventListener('input', () => {
+  const pricePerKg = parseFloat(document.getElementById('saPricePerKg').value) || 0;
+  const weightKg   = parseFloat(document.getElementById('saWeightKg').value) || 0;
+  const importe    = Math.round(pricePerKg * weightKg * 100) / 100;
+  document.getElementById('saImporteDisplay').textContent = importe > 0 ? fmt(importe) : '—';
+});
+
+document.getElementById('btnSaveScaleAdd').addEventListener('click', async () => {
+  const productCode = document.getElementById('saProductCode').value.trim();
+  const name        = document.getElementById('saName').value.trim();
+  const pricePerKg  = parseFloat(document.getElementById('saPricePerKg').value);
+  const weightKg    = parseFloat(document.getElementById('saWeightKg').value);
+  const weightG     = parseInt(document.getElementById('saWeightG').value);
+  const fullBarcode = document.getElementById('saFullBarcode').value.trim();
+  const msgEl       = document.getElementById('saMsg');
+
+  if (!name || isNaN(pricePerKg) || pricePerKg <= 0) {
+    msgEl.textContent = '⚠️ Completá el nombre y el precio por kg';
+    msgEl.className   = 'text-xs text-yellow-400 font-mono text-center';
+    return;
+  }
+
+  const btn = document.getElementById('btnSaveScaleAdd');
+  showLoading(btn, 'Guardando...');
+
+  try {
+    const productData = {
+      name,
+      barcode:    productCode,
+      isScale:    true,
+      isCigarrillo: false,
+      pricePerKg,
+      price:      0,
+      stock:      9999,
+      section:    'Fiambres',
+      brand:      '',
+      createdAt:  serverTimestamp(),
+      updatedAt:  serverTimestamp(),
+    };
+
+    await setDoc(doc(db, 'productos', productCode), productData, { merge: true });
+    toast(`✅ "${name}" guardado — $${pricePerKg}/kg`, 'success');
+
+    // Ahora agregar al carrito con el peso e importe correctos
+    const importe = Math.round(pricePerKg * weightKg * 100) / 100;
+    const cartProduct = {
+      ...productData,
+      id:          fullBarcode || productCode,
+      price:       importe,
+      _isScale:    true,
+      _baseId:     productCode,
+      _weightKg:   weightKg,
+      _weightG:    weightG,
+      _pricePerKg: pricePerKg,
+    };
+
+    closeModal('modalScaleAdd');
+    addScaleProductToCart(cartProduct);
+    document.getElementById('scanStatus').textContent =
+      `⚖️ ${name} — ${weightKg.toFixed(3)} kg × ${fmt(pricePerKg)}/kg = ${fmt(importe)}`;
+    setTimeout(() => { document.getElementById('scanStatus').textContent = '📡 Listo para escanear'; }, 3000);
+    refocusBarcode();
+
+  } catch (e) {
+    msgEl.textContent = `❌ Error: ${e.message}`;
+    msgEl.className   = 'text-xs text-red-400 font-mono text-center';
+  } finally {
+    stopLoading(btn);
+  }
+});
+
+document.getElementById('closeModalScaleAdd').addEventListener('click', () => {
+  closeModal('modalScaleAdd');
+  refocusBarcode();
+});
 
 // ── Quick Add Modal ──────────────────────────────────
 function openQuickAddModal(barcode) {
@@ -538,10 +782,10 @@ function renderCart() {
   el.innerHTML = cart.map(item => `
     <div class="cart-item" data-id="${item.id}">
       <div class="flex-1 min-w-0">
-        <p class="text-sm font-600 text-white truncate">
-          ${item.isCigarrillo ? '🚬 ' : item._isScale ? '⚖️ ' : ''}${item.name}
+        <p class="text-sm font-600 text-gray-800 truncate">
+          ${item.isCigarrillo ? '' : item._isScale ? '⚖️ ' : ''}${item.name}
         </p>
-        <p class="text-xs text-[#5a90f7] font-mono">${fmt(item.price)} c/u</p>
+        <p class="text-xs text-gray-500 font-mono">${item._isScale ? item._weightKg.toFixed(3)+' kg × '+fmt(item._pricePerKg)+'/kg' : fmt(item.price)+' c/u'}</p>
       </div>
       <div class="flex items-center gap-1.5">
         <button class="qty-btn w-6 h-6 rounded-md bg-[#232d45] hover:bg-[#2d3a54] text-white text-sm flex items-center justify-center"
@@ -550,7 +794,7 @@ function renderCart() {
         <button class="qty-btn w-6 h-6 rounded-md bg-[#232d45] hover:bg-[#2d3a54] text-white text-sm flex items-center justify-center"
                 onclick="window._posUpdateQty('${item.id}', 1)">+</button>
       </div>
-      <span class="font-display font-700 text-sm text-white ml-2 w-16 text-right">${fmt(item.price * item.quantity)}</span>
+      <span class="font-display font-700 text-sm text-gray-800 ml-2 w-16 text-right">${fmt(item.price * item.quantity)}</span>
       <button class="ml-1 text-red-400 hover:text-red-300 text-xs" onclick="window._posRemove('${item.id}')">✕</button>
     </div>
   `).join('');
@@ -812,6 +1056,7 @@ document.getElementById('btnAddProduct').addEventListener('click', async () => {
   const stock   = parseInt(document.getElementById('prodStock').value);
   const isCigarrillo = document.getElementById('prodIsCigarrillo').checked;
   const isScale      = document.getElementById('prodIsScale').checked;
+  const pricePerKg   = isScale ? (parseFloat(document.getElementById('prodPricePerKg').value) || 0) : 0;
   const msgEl   = document.getElementById('stockMsg');
 
   if (!barcode || !name || isNaN(price) || isNaN(stock)) {
@@ -829,6 +1074,7 @@ document.getElementById('btnAddProduct').addEventListener('click', async () => {
       barcode,
       isCigarrillo,
       isScale,
+      pricePerKg: isScale ? pricePerKg : 0,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     }, { merge: true });
@@ -841,6 +1087,8 @@ document.getElementById('btnAddProduct').addEventListener('click', async () => {
       .forEach(id => document.getElementById(id).value = '');
     document.getElementById('prodIsCigarrillo').checked = false;
     document.getElementById('prodIsScale').checked      = false;
+    document.getElementById('prodPricePerKg').value     = '';
+    document.getElementById('prodPricePerKgWrap').classList.add('hidden');
 
     loadStockList();
     toast(`Producto "${name}" guardado`, 'success');
@@ -887,7 +1135,15 @@ async function loadStockList(filter = '') {
           <p class="text-xs text-gray-400 font-mono">${p.id} · ${p.section || '—'} · ${p.brand || '—'}</p>
         </div>
         <div class="flex items-center gap-2 flex-shrink-0">
-          <p class="text-brand-600 font-mono font-bold text-sm">${fmt(p.price)}</p>
+          <!-- Precio editable inline -->
+          <div class="flex items-center gap-1">
+            <span class="text-xs text-gray-400 font-mono">$</span>
+            <input id="price-val-${p.id}"
+              type="number" step="0.01" value="${p.price}"
+              class="font-mono font-bold text-sm text-brand-600 w-20 border border-transparent rounded px-1 py-0.5
+                     hover:border-gray-300 focus:border-brand-500 focus:outline-none bg-transparent text-right"
+              onchange="window._updatePrice('${p.id}', this.value)" />
+          </div>
           <!-- Stock editable inline -->
           <div class="flex items-center gap-1 bg-gray-100 border border-gray-200 rounded-lg px-1.5 py-0.5">
             <button onclick="window._adjustStock('${p.id}', -1, ${p.stock})"
@@ -896,6 +1152,9 @@ async function loadStockList(filter = '') {
             <button onclick="window._adjustStock('${p.id}', 1, ${p.stock})"
               class="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gray-800 text-base leading-none transition-colors font-bold">+</button>
           </div>
+          <!-- Eliminar -->
+          <button onclick="window._deleteProduct('${p.id}', '${p.name.replace(/'/g, '')}')"
+            class="w-6 h-6 flex items-center justify-center text-gray-300 hover:text-red-500 transition-colors text-sm font-bold ml-1">✕</button>
         </div>
       </div>
     `}).join('');
@@ -1075,8 +1334,8 @@ async function loadCierreHistorial() {
             <div class="flex justify-between"><span>Efectivo:</span><span class="text-green-700 font-semibold">${fmt(c.efectivo || 0)}</span></div>
             <div class="flex justify-between"><span>Tarjeta:</span><span class="text-blue-700 font-semibold">${fmt(c.debito_credito || 0)}</span></div>
             <div class="flex justify-between"><span>QR:</span><span class="text-yellow-700 font-semibold">${fmt(c.qr || 0)}</span></div>
-            ${c.totalCigarrillos ? `<div class="flex justify-between border-t border-gray-200 pt-1 mt-1"><span>🚬 Cigarrillos:</span><span class="text-orange-600 font-semibold">${fmt(c.totalCigarrillos)}</span></div>` : ''}
-            ${c.cajaFuerte ? `<div class="flex justify-between"><span>🏦 Caja Fuerte:</span><span class="text-indigo-700 font-semibold">${fmt(c.cajaFuerte)}</span></div>` : ''}
+            ${c.totalCigarrillos ? `<div class="flex justify-between border-t border-gray-200 pt-1 mt-1"><span>Cigarrillos:</span><span class="text-orange-600 font-semibold">${fmt(c.totalCigarrillos)}</span></div>` : ''}
+            ${c.cajaFuerte ? `<div class="flex justify-between"><span>Caja Fuerte:</span><span class="text-indigo-700 font-semibold">${fmt(c.cajaFuerte)}</span></div>` : ''}
             <div class="text-gray-400 mt-1">${ts} · ${c.closedBy || ''}</div>
           </div>
         </div>
@@ -1108,6 +1367,34 @@ function closeModal(id) {
     if (e.target.id === id) closeModal(id);
   });
 });
+
+// ── Update price inline ──────────────────────────────
+window._updatePrice = async function(productId, newPriceStr) {
+  const newPrice = parseFloat(newPriceStr);
+  if (isNaN(newPrice) || newPrice < 0) return;
+  try {
+    await updateDoc(doc(db, 'productos', productId), {
+      price: newPrice,
+      updatedAt: serverTimestamp(),
+    });
+    toast('Precio actualizado', 'success');
+  } catch (e) {
+    toast(`Error al actualizar precio: ${e.message}`, 'error');
+  }
+};
+
+// ── Delete product ────────────────────────────────────
+window._deleteProduct = async function(productId, productName) {
+  if (!confirm(`¿Eliminar "${productName}"? Esta acción no se puede deshacer.`)) return;
+  try {
+    const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    await deleteDoc(doc(db, 'productos', productId));
+    toast(`"${productName}" eliminado`, 'info');
+    loadStockList();
+  } catch (e) {
+    toast(`Error al eliminar: ${e.message}`, 'error');
+  }
+};
 
 // ── Adjust stock inline ───────────────────────────────
 window._adjustStock = async function(productId, delta, currentStock) {
@@ -1263,6 +1550,146 @@ document.getElementById('btnStockScan').addEventListener('click', startStockScan
 document.getElementById('btnStockStopScan').addEventListener('click', stopStockScanner);
 
 // ════════════════════════════════════════════════════
+//   CAJA FUERTE
+//   - Colección: caja_fuerte_movimientos
+//   - Solo addDoc (nunca deleteDoc) → registros inmutables
+//   - Campos: tipo, monto, descripcion, usuario, timestamp
+// ════════════════════════════════════════════════════
+
+let cfTipoActual = 'ingreso'; // 'ingreso' | 'egreso'
+
+// ── Abrir modal ───────────────────────────────────────
+function openCFModal(tipo) {
+  cfTipoActual = tipo;
+  const isIngreso = tipo === 'ingreso';
+
+  document.getElementById('cfModalTitle').textContent =
+    isIngreso ? 'Ingreso a Caja Fuerte' : 'Egreso de Caja Fuerte';
+
+  const indicator = document.getElementById('cfModalIndicator');
+  indicator.style.background = isIngreso ? '#16a34a' : '#e51111';
+
+  const label = document.getElementById('cfModalTypeLabel');
+  const svg   = indicator.querySelector('svg path');
+  label.textContent = isIngreso ? 'INGRESO' : 'EGRESO';
+  if (svg) svg.setAttribute('d', isIngreso
+    ? 'M12 4v16m8-8H4'
+    : 'M20 12H4');
+
+  document.getElementById('cfMonto').value       = '';
+  document.getElementById('cfDescripcion').value = '';
+  document.getElementById('cfMsg').textContent   = '';
+
+  openModal('modalCajaFuerte');
+  setTimeout(() => document.getElementById('cfMonto').focus(), 100);
+}
+
+document.getElementById('btnCFIngreso').addEventListener('click', () => openCFModal('ingreso'));
+document.getElementById('btnCFEgreso').addEventListener('click',  () => openCFModal('egreso'));
+document.getElementById('closeModalCF').addEventListener('click', () => closeModal('modalCajaFuerte'));
+document.getElementById('btnCancelCF').addEventListener('click',  () => closeModal('modalCajaFuerte'));
+
+// ── Confirmar movimiento ──────────────────────────────
+document.getElementById('btnConfirmCF').addEventListener('click', async () => {
+  const monto      = parseFloat(document.getElementById('cfMonto').value);
+  const descripcion = document.getElementById('cfDescripcion').value.trim();
+  const msgEl      = document.getElementById('cfMsg');
+
+  if (!monto || monto <= 0) {
+    msgEl.textContent = 'Ingresá un monto válido mayor a cero';
+    return;
+  }
+  if (!descripcion) {
+    msgEl.textContent = 'Ingresá una descripción para el movimiento';
+    return;
+  }
+
+  const btn = document.getElementById('btnConfirmCF');
+  showLoading(btn, 'Guardando...');
+
+  try {
+    // addDoc siempre → nunca se sobreescribe ni elimina
+    await addDoc(collection(db, 'caja_fuerte_movimientos'), {
+      tipo:        cfTipoActual,          // 'ingreso' | 'egreso'
+      monto:       cfTipoActual === 'ingreso' ? Math.abs(monto) : -Math.abs(monto),
+      montoAbs:    Math.abs(monto),
+      descripcion,
+      usuario:     auth.currentUser?.email || 'sistema',
+      timestamp:   serverTimestamp(),
+      // Fecha/hora local legible (inmutable en el doc)
+      fechaHora:   new Date().toLocaleString('es-AR', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: false,
+      }),
+    });
+
+    toast(
+      `${cfTipoActual === 'ingreso' ? 'Ingreso' : 'Egreso'} registrado: $${monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`,
+      'success'
+    );
+    closeModal('modalCajaFuerte');
+    loadCajaFuerteHistorial();
+  } catch(e) {
+    msgEl.textContent = `Error: ${e.message}`;
+  } finally {
+    stopLoading(btn);
+  }
+});
+
+// ── Cargar historial y balance ────────────────────────
+async function loadCajaFuerteHistorial() {
+  const el     = document.getElementById('cfHistorial');
+  const balEl  = document.getElementById('cfBalance');
+  if (!el || !balEl) return;
+
+  try {
+    const q    = query(
+      collection(db, 'caja_fuerte_movimientos'),
+      orderBy('timestamp', 'desc'),
+      limit(100)
+    );
+    const snap = await getDocs(q);
+
+    if (snap.empty) {
+      el.innerHTML = '<p class="text-surface-400 text-sm text-center py-8">Sin movimientos registrados</p>';
+      balEl.textContent = fmt(0);
+      return;
+    }
+
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // Calcular balance (sumar todos los montos con signo)
+    const balance = docs.reduce((s, d) => s + (d.monto || 0), 0);
+    balEl.textContent = fmt(balance);
+    balEl.style.color = balance >= 0 ? '#e51111' : '#dc2626';
+
+    el.innerHTML = docs.map(d => {
+      const isIngreso = d.tipo === 'ingreso';
+      const ts = d.fechaHora || (d.timestamp?.toDate ? d.timestamp.toDate().toLocaleString('es-AR') : '—');
+      return `
+        <div class="flex items-center gap-3 p-3 rounded-xl border ${isIngreso ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'}">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${isIngreso ? 'bg-green-600' : 'bg-brand-600'}">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="${isIngreso ? 'M12 4v16m8-8H4' : 'M20 12H4'}"/>
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold text-gray-800 dark:text-white truncate">${d.descripcion}</p>
+            <p class="text-xs text-gray-400 dark:text-gray-500 font-mono">${ts} · ${d.usuario || ''}</p>
+          </div>
+          <span class="font-display font-700 text-sm flex-shrink-0 ${isIngreso ? 'text-green-700' : 'text-brand-600'}">
+            ${isIngreso ? '+' : '−'}${fmt(Math.abs(d.monto || d.montoAbs || 0))}
+          </span>
+        </div>
+      `;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = `<p class="text-red-400 text-sm text-center py-4">Error: ${e.message}</p>`;
+  }
+}
+
+// ════════════════════════════════════════════════════
 //   INIT
 // ════════════════════════════════════════════════════
 
@@ -1270,8 +1697,20 @@ function initApp() {
   renderCart();
   switchTab('pos');
 
+  // Sync dark mode icons
+  const isDark = document.documentElement.classList.contains('dark');
+  const sun  = document.getElementById('iconSun');
+  const moon = document.getElementById('iconMoon');
+  if (sun)  sun.classList.toggle('hidden', !isDark);
+  if (moon) moon.classList.toggle('hidden', isDark);
+
   // Pre-fill cierre date
   document.getElementById('cierreFecha').textContent = new Date().toLocaleDateString('es-AR');
+
+  // Mostrar/ocultar campo precio por kg cuando se tilda balanza
+  document.getElementById('prodIsScale').addEventListener('change', (e) => {
+    document.getElementById('prodPricePerKgWrap').classList.toggle('hidden', !e.target.checked);
+  });
 
   console.log('%c🛒 Canocchi POS — Sistema iniciado', 'color:#1a56e8;font-weight:bold;font-size:14px');
 }
