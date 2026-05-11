@@ -189,17 +189,38 @@ document.querySelectorAll('.nav-btn, .mob-nav').forEach(btn => {
 //   (mismo enfoque que PuntoStock: 1920×1080, sin html5-qrcode)
 // ════════════════════════════════════════════════════
 
+// ════════════════════════════════════════════════════
+//   SCANNER — BarcodeDetector nativo (iOS/Android)
+//   con fallback a ZXing si no está disponible
+// ════════════════════════════════════════════════════
+
 let _cameraStream   = null;
 let _scanInterval   = null;
 let _videoTrack     = null;
+let _barcodeDetector = null;
 
+// Inicializar BarcodeDetector nativo si el navegador lo soporta
+async function _initDetector() {
+  if (_barcodeDetector) return _barcodeDetector;
+  if ('BarcodeDetector' in window) {
+    try {
+      _barcodeDetector = new BarcodeDetector({
+        formats: ['ean_13','ean_8','code_128','code_39','upc_a','upc_e','qr_code','data_matrix','itf','codabar']
+      });
+      return _barcodeDetector;
+    } catch(_) {}
+  }
+  return null;
+}
+
+// Cargar ZXing como fallback
 function loadZXing() {
   return new Promise((resolve) => {
     if (window.ZXing) { resolve(); return; }
     const s = document.createElement('script');
     s.src = 'https://unpkg.com/@zxing/library@0.18.6/umd/index.min.js';
     s.onload = resolve;
-    s.onerror = () => { console.warn('ZXing no cargó'); resolve(); };
+    s.onerror = () => { resolve(); }; // si falla, seguimos igual
     document.head.appendChild(s);
   });
 }
@@ -221,7 +242,6 @@ async function startScanner() {
     _cameraStream = stream;
     scannerActive = true;
 
-    // Montar el <video> dentro del contenedor existente
     readerEl.innerHTML = `
       <div style="position:relative;width:100%;background:#000;border-radius:0.75rem;overflow:hidden;">
         <video id="scanner-video" autoplay playsinline muted
@@ -236,7 +256,7 @@ async function startScanner() {
     const video = document.getElementById('scanner-video');
     video.srcObject = stream;
 
-    // Track para linterna
+    // Linterna
     _videoTrack = stream.getVideoTracks()[0];
     const caps  = _videoTrack.getCapabilities?.() || {};
     const torchBtn = document.getElementById('btnTorch');
@@ -249,56 +269,95 @@ async function startScanner() {
     document.getElementById('btnStopScan').classList.remove('hidden');
     statusEl.textContent = 'Iniciando cámara…';
 
-    // Cargar ZXing si no está
-    if (!window.ZXing) {
-      statusEl.textContent = 'Cargando lector…';
-      await loadZXing();
-    }
-
-    // Esperar que el video esté realmente reproduciendo antes de escanear
+    // Esperar que el video esté listo
     await new Promise((resolve) => {
       if (video.readyState >= 2) { resolve(); return; }
       video.addEventListener('canplay', resolve, { once: true });
-      // timeout de seguridad por si canplay no dispara
-      setTimeout(resolve, 3000);
+      setTimeout(resolve, 3000); // timeout de seguridad
     });
 
-    if (!scannerActive) return; // fue detenido mientras esperábamos
+    if (!scannerActive) return;
 
-    statusEl.textContent = 'Apuntá el código de barras al recuadro rojo';
-    _startZXingScan(video);
+    // Intentar BarcodeDetector nativo primero
+    const detector = await _initDetector();
+
+    if (detector) {
+      // ── Camino nativo (rápido, sin librerías) ──
+      statusEl.textContent = 'Apuntá el código al recuadro rojo';
+      _startNativeScan(video, detector);
+    } else {
+      // ── Fallback ZXing ──
+      statusEl.textContent = 'Cargando lector…';
+      await loadZXing();
+      if (!scannerActive) return;
+      if (!window.ZXing) {
+        statusEl.textContent = 'Lector no disponible — usá el escáner físico';
+        return;
+      }
+      statusEl.textContent = 'Apuntá el código al recuadro rojo';
+      _startZXingScan(video);
+    }
 
   } catch (e) {
     scannerActive = false;
     if (e.name === 'NotAllowedError') {
-      toast('Permiso de cámara denegado. Habilitalo en la configuración del navegador.', 'error');
+      toast('Permiso de cámara denegado. Habilitalo en ajustes del navegador.', 'error');
     } else {
       toast(`Error de cámara: ${e.message || e}`, 'error');
     }
   }
 }
 
+// ── Escaneo con BarcodeDetector nativo ───────────────
+function _startNativeScan(video, detector) {
+  const statusEl = document.getElementById('scanStatus');
+
+  _scanInterval = setInterval(async () => {
+    if (!scannerActive || !video || video.readyState < 2) return;
+    try {
+      const barcodes = await detector.detect(video);
+      if (!barcodes || !barcodes.length) return;
+
+      const code = barcodes[0].rawValue;
+      if (!code) return;
+      if (scanCooldown || code === lastScannedCode) return;
+      scanCooldown    = true;
+      lastScannedCode = code;
+      setTimeout(() => { scanCooldown = false; lastScannedCode = ''; }, 2500);
+
+      playBeep();
+      clearInterval(_scanInterval);
+      _scanInterval = null;
+      if (statusEl) statusEl.textContent = `Buscando: ${code}…`;
+
+      await addProductToCartByBarcode(code);
+
+      // Reanudar escaneo si la cámara sigue activa
+      if (scannerActive) {
+        setTimeout(() => {
+          const v = document.getElementById('scanner-video');
+          if (scannerActive && v && !_scanInterval) {
+            if (statusEl) statusEl.textContent = 'Apuntá el próximo código';
+            _startNativeScan(v, detector);
+          }
+        }, 1200);
+      }
+    } catch (_) { /* sin barcode en el frame, normal */ }
+  }, 200);
+}
+
+// ── Escaneo con ZXing (fallback) ─────────────────────
 function _startZXingScan(video) {
   const statusEl = document.getElementById('scanStatus');
-  if (!window.ZXing) {
-    if (statusEl) statusEl.textContent = 'Lector no disponible. Usá el escáner físico.';
-    return;
-  }
 
-  const hints   = new Map();
-  const formats = [
-    ZXing.BarcodeFormat.EAN_13,
-    ZXing.BarcodeFormat.EAN_8,
-    ZXing.BarcodeFormat.CODE_128,
-    ZXing.BarcodeFormat.CODE_39,
-    ZXing.BarcodeFormat.QR_CODE,
-    ZXing.BarcodeFormat.UPC_A,
-    ZXing.BarcodeFormat.UPC_E,
-    ZXing.BarcodeFormat.DATA_MATRIX,
-    ZXing.BarcodeFormat.ITF,
-    ZXing.BarcodeFormat.CODABAR,
-  ];
-  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+  const hints = new Map();
+  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+    ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
+    ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
+    ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.UPC_A,
+    ZXing.BarcodeFormat.UPC_E, ZXing.BarcodeFormat.DATA_MATRIX,
+    ZXing.BarcodeFormat.ITF, ZXing.BarcodeFormat.CODABAR,
+  ]);
   hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
 
   const reader = new ZXing.MultiFormatReader();
@@ -313,7 +372,6 @@ function _startZXingScan(video) {
       canvas.height = video.videoHeight || 480;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
       const imgData   = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const luminance = new ZXing.RGBLuminanceSource(imgData.data, canvas.width, canvas.height);
       const bitmap    = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
@@ -321,35 +379,29 @@ function _startZXingScan(video) {
 
       if (result) {
         const code = result.getText();
-        if (scanCooldown || code === lastScannedCode) return;
+        if (!code || scanCooldown || code === lastScannedCode) return;
         scanCooldown    = true;
         lastScannedCode = code;
         setTimeout(() => { scanCooldown = false; lastScannedCode = ''; }, 2500);
 
         playBeep();
-        if (statusEl) statusEl.textContent = `Buscando: ${code}…`;
-        // Detener el loop (no la cámara completa) para no procesar más frames
         clearInterval(_scanInterval);
         _scanInterval = null;
-        // Procesar el código — si no existe abre el modal de alta
+        if (statusEl) statusEl.textContent = `Buscando: ${code}…`;
+
         addProductToCartByBarcode(code).then(() => {
-          // Reiniciar el escaneo después de un breve delay
           if (scannerActive) {
-            const v = document.getElementById('scanner-video');
-            if (v) {
-              setTimeout(() => {
-                if (scannerActive && !_scanInterval) {
-                  if (statusEl) statusEl.textContent = 'Apuntá el próximo código';
-                  _startZXingScan(v);
-                }
-              }, 1500);
-            }
+            setTimeout(() => {
+              const v = document.getElementById('scanner-video');
+              if (scannerActive && v && !_scanInterval) {
+                if (statusEl) statusEl.textContent = 'Apuntá el próximo código';
+                _startZXingScan(v);
+              }
+            }, 1200);
           }
         });
       }
-    } catch (_) {
-      // NotFoundException es normal cuando no hay código en el frame
-    }
+    } catch (_) { /* NotFoundException = normal */ }
   }, 250);
 }
 
@@ -1529,7 +1581,7 @@ async function exportStockToExcel() {
 document.getElementById('btnExportExcel').addEventListener('click', exportStockToExcel);
 
 // ════════════════════════════════════════════════════
-//   STOCK TAB — BARCODE SCANNER (ZXing)
+//   STOCK TAB — BARCODE SCANNER
 // ════════════════════════════════════════════════════
 
 let _stockCameraStream = null;
@@ -1566,48 +1618,80 @@ async function startStockScanner() {
 
     const video = document.getElementById('stock-scanner-video');
     video.srcObject = stream;
-    statusEl.textContent = 'Apuntá al código de barras';
 
-    if (!window.ZXing) {
+    // Esperar que el video esté listo
+    await new Promise((resolve) => {
+      if (video.readyState >= 2) { resolve(); return; }
+      video.addEventListener('canplay', resolve, { once: true });
+      setTimeout(resolve, 3000);
+    });
+
+    if (!stockScannerActive) return;
+
+    const onCode = (code) => {
+      playBeep();
+      document.getElementById('prodBarcode').value = code;
+      statusEl.textContent = `Código: ${code}`;
+      stopStockScanner();
+      setTimeout(() => document.getElementById('prodName').focus(), 200);
+    };
+
+    // Intentar BarcodeDetector nativo primero
+    const detector = await _initDetector();
+    if (detector) {
+      statusEl.textContent = 'Apuntá al código de barras';
+      _stockScanInterval = setInterval(async () => {
+        if (!stockScannerActive || !video || video.readyState < 2) return;
+        try {
+          const barcodes = await detector.detect(video);
+          if (barcodes && barcodes.length && barcodes[0].rawValue) {
+            clearInterval(_stockScanInterval);
+            _stockScanInterval = null;
+            onCode(barcodes[0].rawValue);
+          }
+        } catch(_) {}
+      }, 200);
+    } else {
+      // Fallback ZXing
       statusEl.textContent = 'Cargando lector…';
       await loadZXing();
+      if (!stockScannerActive || !window.ZXing) {
+        statusEl.textContent = 'Lector no disponible — ingresá el código manualmente';
+        return;
+      }
+      statusEl.textContent = 'Apuntá al código de barras';
+      const hints = new Map();
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+        ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
+        ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
+        ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
+        ZXing.BarcodeFormat.QR_CODE,
+      ]);
+      hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+      const reader = new ZXing.MultiFormatReader();
+      reader.setHints(hints);
+
+      _stockScanInterval = setInterval(() => {
+        if (!stockScannerActive || !video || video.readyState < 2) return;
+        const canvas = document.getElementById('stock-scanner-canvas');
+        if (!canvas) return;
+        try {
+          canvas.width  = video.videoWidth  || 640;
+          canvas.height = video.videoHeight || 480;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imgData   = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const luminance = new ZXing.RGBLuminanceSource(imgData.data, canvas.width, canvas.height);
+          const bitmap    = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
+          const result    = reader.decode(bitmap);
+          if (result && result.getText()) {
+            clearInterval(_stockScanInterval);
+            _stockScanInterval = null;
+            onCode(result.getText());
+          }
+        } catch(_) {}
+      }, 250);
     }
-
-    const hints   = new Map();
-    const formats = [
-      ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
-      ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
-      ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
-      ZXing.BarcodeFormat.QR_CODE,
-    ];
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
-    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-    const reader = new ZXing.MultiFormatReader();
-    reader.setHints(hints);
-
-    _stockScanInterval = setInterval(() => {
-      if (!stockScannerActive || !video || video.readyState < 2) return;
-      const canvas = document.getElementById('stock-scanner-canvas');
-      if (!canvas) return;
-      try {
-        canvas.width  = video.videoWidth  || 640;
-        canvas.height = video.videoHeight || 480;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const imgData   = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const luminance = new ZXing.RGBLuminanceSource(imgData.data, canvas.width, canvas.height);
-        const bitmap    = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
-        const result    = reader.decode(bitmap);
-        if (result) {
-          const code = result.getText();
-          playBeep();
-          document.getElementById('prodBarcode').value = code;
-          statusEl.textContent = `Código: ${code}`;
-          stopStockScanner();
-          setTimeout(() => document.getElementById('prodName').focus(), 200);
-        }
-      } catch (_) {}
-    }, 250);
 
   } catch (e) {
     wrap.classList.add('hidden');
