@@ -42,21 +42,17 @@ let scanCooldown       = false;
 let torchOn            = false; // linterna estado
 let currentCamTrack    = null;  // track de la cámara activa para torch
 
-// ── Beep on scan ─────────────────────────────────────
+// ── Beep on scan — sonido real de escáner ────────────
+const _BEEP_B64 = 'SUQzBAAAAAABClRYWFgAAAASAAADbWFqb3JfYnJhbmQAaXNvbQBUWFhYAAAAEwAAA21pbm9yX3ZlcnNpb24ANTEyAFRYWFgAAAAkAAADY29tcGF0aWJsZV9icmFuZHMAaXNvbWlzbzJhdmMxbXA0MQBUU1NFAAAADwAAA0xhdmY2MC4xNi4xMDAAAAAAAAAAAAAAAP/7UAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFhpbmcAAAAPAAAAdwAAOjoABw4QERMXGRocHzA2PUNITlBSVFZYW11fYWJmaGlrbXFydHZ4e31/gYKEiIqLjY+TlJaYmp2foaOkqKqsra+xtLa4ury/wcPFxsrMzc/R1dbY2tze4ePl5ujs7u/x8/f4+vz+AAAAAExhdmM2MC4zMQAAAAAAAAAAAAAAACQFQAAAAAAAADo6vFAiMwAAAAAAAAAAAAAAAAAAAAD/+xBEAA/wAAB/gAAACAAAD/AAAAEAAAH+AAAAIAAAP8AAAAT6s9////+zujHrV3dVa7qXtKvLRfQ8Oz3X+tVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/7EEQiAAAAAH+FAAAIAAAP8KAAAQAAAf4YAAAAAAA/wwAAAFVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//uQZEQAANIASQYAAAAAAA/wwAAAAAAB/hwAACAAAD/DgAAEVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//sQZN2P8AAAf4AAAAgAAA/wAAABAAAB/gAAACAAAD/AAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf//hT/+tvoAwFA4GFQqAAkAgBAQA80/3M8dCfxZ4s7qNECIATggn6R/Fz/+xBk3Y/wAAB/gAAACAAAD/AAAAEAAAH+AAAAIAAAP8AAAASArwuYGX/8ZNA3N/5cP+M2HHjgJ8k0P/9TqNC8XG/+d//0nAT///eAAIBRuNhkARABQIAgB/9ey03EWCSdE3L45A3Qb//7EGTdj/AAAH+AAAAIAAAP8AAAAQAAAf4AAAAgAAA/wAAABHnz6cKoCkG5Kf+aNY5+tXmhQTd//+eRMCUNS8j/wXHngwf/+kch2q3b3MecAAAAuphBFkAICMo1h+zP4qxnVrNRFOSQ//sQZN2P8AAAf4AAAAgAAA/wAAABAAAB/gAAACAAAD/AAAAEGYXgRQ6EqAWGChCoIGICYJEjNxJn5aZY4VBDRmqZSoNLaerJAvWa0PLGbnEBr4rTuzPAN/ZDiFwBlrgRx/2/fR2rKyv/+xBk3Y/wAAB/gAAACAAAD/AAAAEAAAH+AAAAIAAAP8AAAASYVNWpQuSW38tgkAMMFV1T1urLU7u7///+Xmluv//dustFgb//f5rJp5Xbvd/crl6c1TLv9ux1ug8E45//67H88+4b7f/7EGTdj/AAAH+AAAAIAAAP8AAAAQAAAf4AAAAgAAA/wAAABOz/GN1IxhrLuss3hiunjy7//9XVWfl+v/////ff9vhoPt85///5Tk/r1KAsFRXvO///9p9qPgAD1U3ZW5AAAFrLUMTx//sQZN2P8AAAf4AAAAgAAA/wAAABAAAB/gAAACAAAD/AAAAEAIX50fBiQ6RcFGAZIA28ASInyeHAgccEIwxJ2ykapu0pJGrLgrYpZaYFcY8eGNVJNmUwuRaChp5Vt+bIEoHZagsGvl3/+xBk4Q/wGADIAAAAAAQAGQAAAAAAAAH+AAAAIAAAP8AAAARqWpTUF2xcuFyw5JdrQ9VQEmLJIsfhjLwaTWbW3nL6sjXOgWgKBwzn/VrNhFjGeOrE9Soxq4hiMU/cdNzgdSvPln8Zlv/7MGT/gAAAAH+FAAAIAAAP8KAAAQlExTm4eIABCpjndwLQAEKEkBBq9y9/1KV9U+TAg1JxiZh+SyOkLkAAExkuxSY/v+TcubhdJQtvf//47riQBXEssVLGEPz/wW4+c3bAoVAff5v9f9M8L+QP/l6TAmITnzv/jjjJWtX9J/9/v3XUAG7Uzleq1ez72wKxdJFfJk5ppRsrKyHk0f/7sGT1AAbhZlP+Y2AA76zKb8nogA0Bj1n8+gAJTLGrP5bQATxuiiZOkosiEoWMgaxiBZUbl0vMddvQ//3SeTQ1zVD+r360tdbusyOGIyohxij////6I5hW////7u5SFdNUf///1KmKIvxbDFKQAAP3+hQBoKZG//9IAU80fTYCclB/DxSWS1bGNdE4VAAnCclFdSX7rQbXV/1mIXC/////RYaxWOK////6JiEUJZ/////cqDdNUf///7uxoH8KRyjd7e/9p0AyYqDdbg0qqnxOKSwFMiHq3aTfmtG8codI1gDIwyxi17fQSR3qf/zIWXX////8sjaW3////WwgsSCf///+tVIQM/////bI0b1Xd////UKBXqJO63Boqq7Zjjzg83PthPUes+58tlwHRqARfDkGaDPb7ff/a6RHiOk2///79aklj6IVf////ouLhK////+9pZEKI////26JRLXB4B3/sMBnhQEHs/RxZ2NREWCNvMktGKIhAEToH4hvJ9lVft/f/zoyybf////OkLb////1jdX////7Vjgb////86S2hwBv/TqBw+A6vMv1AQEwM4CCgQvc1mzlKWVPqa9qQNrnqj/MTVpy/+wHWf//67m8oeQkAXQfr////9BK////+7i4Ai3////6ktUAAADe92A4gQA//1aMLAI1BA/PqRNrDpmt2hHLM80E3+yDqqdaT/+LVn////+RR1W3////pAtBCb////n3IgJ6h////+sjAAAAbuIgEB4IOtbz5W12V2f/C7rtJG2WLvOdJFnb8S+ugZp+o8qqz3/8yDGaTf/6kUTQ3WgbOqgURwl8XOFU//uARNiAAnVjVnhpodBQTFrvDZRKCFmLXeCmSwEmMWt8LKpIWf////UiF/x5f////qpBcZ2////+o+H9jAZcUASxRO8TDzZszazJeB0awCHAuYxVdm+z///ODJuv6Hdf//5ZG+x7X////UI6Kn////oTMNif////+Wg/IUDqwEV2sNhtzVJIokoNUXgIZQxhmgzs33f9bfbUWRalq//+r2sldiVE1X////9Yypv////+scH////6zIl0KgAAAA+jECHEk7sGRWvDbvwFUpLGOdJKIxH0jzrbFoMMaSxSVMPzzzjF6np6e3n+s1vqQQQoC0QMzd60E1l9P/f1qQQWmmRRSMW///06908f202/u/96DJpqZjpYC6i6Farf+g10U0z3QRL4ZUEgAAAB+IQMKkKzcLi4PIN63JgmAzwklIJpqayCCyKGjLTTTTq/0y+Lit///tTTPy4aIEPCqZO3//+pA0WgxmXw65Lf/6D/+4BE5wiCMWLW+LlsmFVMWq8DUVsH7Ytf4DKM4QGxa/wB0Yy000vZU0WU1j5DbEEOq//pvZJBmMC4XC5Mw3g2N0g+VAGzNt+unOuWwfUaqtYa/wU6K6OEcKpe7a1VVWAagKh7SFHM08MzM5IdHEqKrXyq1///wzWzSoqaULHzX//////3ysT9LF8L//x//40WdaZpUOSwgFvXv///9r1XZf1JU44AxQB4iZM+FYI9Hi5x8+SdtQiFG3a1rf+sVjMl6s4hyzPov/UrFL6l//zZjOodFSmf///mcpVDodIHit//+Z0M+UOkEgFBF//+v1MZ1KIipQAAAAyVIST1yyGOZgdKtLGkvY6gagkCDKz0pstFlHD7S6nj1RKMKkQ5ERjkdk//20d3////08dIp6f/+lJpp7GAChz/zqu8AAAAAgxDjr7AjNSyHOfTWnEQrB1Ltpw41rDWs1NHdpX8sn+PnJE89FZLJ+cndjEYS//7kGT9iINrY1f4GWtoYmyLDwEQYwxpjWfgPQ0hQDFsvAeV7AQiceEzHFkaefzFavO5DY04QSra/uab//pVDBSoUhkFLbmBjH9KwZtVxakbdIgmKlpv/G9ZzT5pBm18Z9LfNdVi0s5EhcTVO7dvMZNpVzWmmKPhEWKqhxIkUzaHulWM9m7Maak6///97qlAdOFw5B3deUTt6Ojycc9SGyamo8gYMv3rmNeyaepb7G9ms0NWNOlnmmibpdZ/////yQbyo9aaBvE13PSS3/+6lSSbMz6/Xcf/Xb6RdivKCGDiCfUAAAB5ZjCrt0Q/vGjON92eRn9my0ZqjsR7B1vK79vqNVIsaznvRr1OVh8A7NsbnubpS3TT0OE48ey7OZVzUQ5WVTP6Um/76///WOgiwAAAAXMOLt/pBjWs/O8S7kjq5XP4kgkCW/7qdqhxO7PNNmkJCtjVMUwSwFmd0RUt5qq2arKahGarI54NpmayHNdrbPZf6IrHd+n/9/RWNNKHkkIbMJs2AAarf2cnuK31vxqPWkSivRkO6tytSixEr3Wv/P/7cET6iII2UlT4CDtgTepajwFqewn5S03gPO3hRikqPAWhpX3kgFq/qpZ6u4mZT+qm/r4sS/////4DeDwhm2bAAd6o5OGr+oLDCTQMxQ7qu9NaRi3XZBJ167pDtC+l3OlmGwX3tY2O/////0oAAATZh3RkAfd2fayrOWmSTVFoBRC36y+Zl9DrMx2opZg19t9mozfX/xrv////5YAAAWbCb0EAbdRu6zcwNB3jFMy8COpqeir63uqu+EqONjm5jUDc9iFzKf9G/5G/BAAvmwalNat7GlQckepz+lqW2ZkQ3R1PJf/9bv////5UBwG2gAAXgZnOIIWEYEmPorWsVLj5ZzWOTUy+iLFTf//9NQAA+MQAD0JKnPAlgIBqS//u//5L7////94AAAUkAqAAA+RDNt6kBmMgLv7/+3Bk6giCY1LQeA860FKqWm8B6mlG9MU3oD0NAMQQp/wDNZhIai/yoJK+8JU1pF1qDRMG9//5f9mz697nc2sLow7IUt1IIOmfuTT+e//7f////94A8CABaLGNYOzserEMOCjH//+BP//7auoAoATkEzkV0ENxebu//0bKOj9bo1vAyUf1bv/lNBTYAQCsWanlekyVFzH/+7//9//6wCwAX9yESnIYeTv/9dv/9brT/U1rP1//6wBgBP5eabNFA8MyX//f///+oAIAaKkJX//v//7d9/GgNJeYMRjhgEBTDf/rg2e/9X6f//b9bP///+sAgARpEy//Ak5//////T6Zc5zsMJ6BXf2Zavwg+9FLdSvZEZEWiyCzbvt9v110+bUDWqvL6AP/V//R/+hd/2////3mAkiAJInX//tQZPCIgXoxTegLK0ArZDnNAatqBISFPaAM6uCGkKY0AJ3Q/sSH//9n7m//vRsQn+n//+xP3er//yH/////6f////+n/+nl9dQMjP/////bq9jl1X/pQLZ6p39NPX//7/9P//r9nVplqEJClnrPUihBen9Wu0j/+1FMQU1FMy4xMDBVgClf/CLn/////6/o////9H//Kf/////36QDOe+/wX///09X39+r/////T//1f//////UTEFNRTMuMTAwqqqqqqqqqqqqqqqqqqqqqv/7IGT2CZDHEMtIAzugFoIpjQBnZgLURSaADSsAU4hlZACpyKqqqv/s8Pf/////+51f//S//////3WddRT/L9Qv/////oFLd3b/2///+mpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqr/+yBk94mQwBJKMAJjNB0iKRUALGYChEcpIAXswGMIpKQAvdCqqqqqqqqqqqr//q//6v/+ukxBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqv/+r//pTEFNRTMuMTAw//sQZPWL0IwQyagBWlQN4hklAAoeATBFJQAFTOBEiKREAKXQqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqr//r/////+z//X//1f/9VMQU1FMy4xMDD/+xBk+o/wfBFJKAFjMCACKNAALGYASEUqAADlwE0IZAAAjdBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMP/7IGT6D/DAEUgIAUswDwAJIAAAAAGQQyIABW6QmZ0jgAKJoFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBk9w3wgRDIiAAoYAoAGSAAAAACEEMiAARMgCEAZMAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/7EGTxj/BVAEkAAAAACoAJEAAAAAJEQyAABGzAAAA/wAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//sQZOGP8BQAyYAAAAACgBlAAAAAAFADJgAAAAAAAD/AAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBk4A/wFADKAAAAAAAAD/AAAAEAUAMmAAAAAAAAP8AAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/7EGTlD/BPAMmAAAAAAoAZMAAAAABQAygAAAAAAAA/wAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//sQZN2P8AAAf4AAAAgAAA/wAAABAAAB/gAAACAAAD/AAAAEVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBk3Y/wAAB/gAAACAAAD/AAAAEAAAH+AAAAIAAAP8AAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/7EGTdj/AAAH+AAAAIAAAP8AAAAQAAAf4AAAAgAAA/wAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
+
+const _beepAudio = new Audio(`data:audio/mp3;base64,${_BEEP_B64}`);
+_beepAudio.volume = 0.7;
+
 function playBeep() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(1200, ctx.currentTime);
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.12);
-    setTimeout(() => ctx.close(), 300);
+    const snd = _beepAudio.cloneNode();
+    snd.volume = 0.7;
+    snd.play().catch(() => {});
   } catch (_) {}
 }
 
@@ -189,144 +185,210 @@ document.querySelectorAll('.nav-btn, .mob-nav').forEach(btn => {
 });
 
 // ════════════════════════════════════════════════════
-//   SCANNER (html5-qrcode)
+//   SCANNER — ZXing + getUserMedia nativo
+//   (mismo enfoque que PuntoStock: 1920×1080, sin html5-qrcode)
 // ════════════════════════════════════════════════════
 
-// ── Libera cualquier stream de cámara activo en el navegador ──────────────
-async function forceReleaseCamera() {
-  try {
-    // Pedimos un stream temporal solo para "tomar" la cámara y soltarla limpia
-    const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
-    tempStream.getTracks().forEach(t => t.stop());
-    await new Promise(r => setTimeout(r, 300)); // pequeño delay para que el OS la libere
-  } catch (_) {
-    // Si falla (ej: ya libre) no importa, seguimos igual
-  }
+let _cameraStream   = null;
+let _scanInterval   = null;
+let _videoTrack     = null;
+
+function loadZXing() {
+  return new Promise((resolve) => {
+    if (window.ZXing) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/@zxing/library@0.18.6/umd/index.min.js';
+    s.onload = resolve;
+    s.onerror = () => { console.warn('ZXing no cargó'); resolve(); };
+    document.head.appendChild(s);
+  });
 }
 
 async function startScanner() {
   if (scannerActive) return;
+  const statusEl = document.getElementById('scanStatus');
+  const readerEl = document.getElementById('qr-reader');
 
-  const statusEl  = document.getElementById('scanStatus');
-  const MAX_TRIES = 3;
-
-  for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
-    try {
-      // Intento 2+ → forzar liberación primero
-      if (attempt > 1) {
-        statusEl.textContent = `🔄 Reintentando (${attempt}/${MAX_TRIES})…`;
-        await forceReleaseCamera();
-        await new Promise(r => setTimeout(r, 600 * attempt)); // backoff: 1.2s, 1.8s
-        // Limpiar instancia anterior si quedó colgada
-        if (html5QrCode) {
-          try { await html5QrCode.stop(); html5QrCode.clear(); } catch (_) {}
-          html5QrCode = null;
-        }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: 'environment' },
+        width:  { ideal: 1920 },
+        height: { ideal: 1080 },
       }
+    });
 
-      html5QrCode = new Html5Qrcode("qr-reader");
-      const cameras = await Html5Qrcode.getCameras();
-      if (!cameras.length) { toast('No se encontró cámara', 'error'); return; }
+    _cameraStream = stream;
+    scannerActive = true;
 
-      // Prefer rear camera
-      const cam = cameras.find(c => /back|rear|environment/i.test(c.label)) || cameras[cameras.length - 1];
+    // Montar el <video> dentro del contenedor existente
+    readerEl.innerHTML = `
+      <div style="position:relative;width:100%;background:#000;border-radius:0.75rem;overflow:hidden;">
+        <video id="scanner-video" autoplay playsinline muted
+          style="width:100%;display:block;max-height:260px;object-fit:cover;"></video>
+        <canvas id="scanner-canvas" style="display:none;"></canvas>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;">
+          <div style="width:72%;height:38%;border:2.5px solid rgba(229,17,17,0.85);border-radius:8px;
+                      box-shadow:0 0 0 9999px rgba(0,0,0,0.35);"></div>
+        </div>
+      </div>`;
 
-      await html5QrCode.start(
-        cam.id,
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 150 },
-          aspectRatio: 1.5,
-          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
-        },
-        onScanSuccess,
-        () => {}  // silence errors
-      );
+    const video = document.getElementById('scanner-video');
+    video.srcObject = stream;
 
-      // Grab the video track for torch control + apply continuous focus
-      try {
-        await new Promise(r => setTimeout(r, 800)); // esperar que el stream esté estable
-        const videoEl = document.querySelector('#qr-reader video');
-        if (videoEl && videoEl.srcObject) {
-          const tracks = videoEl.srcObject.getVideoTracks();
-          if (tracks.length) {
-            currentCamTrack = tracks[0];
-            const caps = currentCamTrack.getCapabilities?.() || {};
+    // Track para linterna
+    _videoTrack = stream.getVideoTracks()[0];
+    const caps  = _videoTrack.getCapabilities?.() || {};
+    const torchBtn = document.getElementById('btnTorch');
+    if (torchBtn) {
+      if (caps.torch) { torchBtn.classList.remove('hidden'); torchBtn.classList.add('flex'); }
+      else            { torchBtn.classList.add('hidden');    torchBtn.classList.remove('flex'); }
+    }
 
-            // Aplicar enfoque continuo si el dispositivo lo soporta
-            if (caps.focusMode && caps.focusMode.includes('continuous')) {
-              await currentCamTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-            }
+    document.getElementById('btnStartScan').classList.add('hidden');
+    document.getElementById('btnStopScan').classList.remove('hidden');
+    statusEl.textContent = 'Iniciando cámara…';
 
-            // Mostrar botón de linterna si el dispositivo la soporta
-            if (caps.torch) {
-              document.getElementById('btnTorch').classList.remove('hidden');
-              document.getElementById('btnTorch').classList.add('flex');
-            }
-          }
-        }
-      } catch(_) {}
+    // Cargar ZXing si no está
+    if (!window.ZXing) {
+      statusEl.textContent = 'Cargando lector…';
+      await loadZXing();
+    }
 
-      scannerActive = true;
-      document.getElementById('btnStartScan').classList.add('hidden');
-      document.getElementById('btnStopScan').classList.remove('hidden');
-      statusEl.textContent = '📡 Escáner activo — apuntá al código';
-      return; // éxito, salimos del loop
+    // Esperar que el video esté realmente reproduciendo antes de escanear
+    await new Promise((resolve) => {
+      if (video.readyState >= 2) { resolve(); return; }
+      video.addEventListener('canplay', resolve, { once: true });
+      // timeout de seguridad por si canplay no dispara
+      setTimeout(resolve, 3000);
+    });
 
-    } catch (e) {
-      const isNotReadable = e.name === 'NotReadableError' || /not readable|video source/i.test(e.message);
+    if (!scannerActive) return; // fue detenido mientras esperábamos
 
-      if (isNotReadable && attempt < MAX_TRIES) {
-        // Cámara ocupada por otra app → reintentamos
-        console.warn(`[Scanner] Intento ${attempt} fallido (NotReadableError). Reintentando...`);
-        continue;
-      }
+    statusEl.textContent = 'Apuntá el código de barras al recuadro rojo';
+    _startZXingScan(video);
 
-      // Último intento o error distinto → mostramos mensaje útil
-      const msg = isNotReadable
-        ? `Cámara en uso por otra app. Cerrá Teams/Zoom y volvé a intentar.`
-        : (e.message || String(e));
-      toast(`Error de cámara: ${msg}`, 'error');
-      statusEl.textContent = '';
-      return;
+  } catch (e) {
+    scannerActive = false;
+    if (e.name === 'NotAllowedError') {
+      toast('Permiso de cámara denegado. Habilitalo en la configuración del navegador.', 'error');
+    } else {
+      toast(`Error de cámara: ${e.message || e}`, 'error');
     }
   }
 }
 
+function _startZXingScan(video) {
+  const statusEl = document.getElementById('scanStatus');
+  if (!window.ZXing) {
+    if (statusEl) statusEl.textContent = 'Lector no disponible. Usá el escáner físico.';
+    return;
+  }
+
+  const hints   = new Map();
+  const formats = [
+    ZXing.BarcodeFormat.EAN_13,
+    ZXing.BarcodeFormat.EAN_8,
+    ZXing.BarcodeFormat.CODE_128,
+    ZXing.BarcodeFormat.CODE_39,
+    ZXing.BarcodeFormat.QR_CODE,
+    ZXing.BarcodeFormat.UPC_A,
+    ZXing.BarcodeFormat.UPC_E,
+    ZXing.BarcodeFormat.DATA_MATRIX,
+    ZXing.BarcodeFormat.ITF,
+    ZXing.BarcodeFormat.CODABAR,
+  ];
+  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+  hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+
+  const reader = new ZXing.MultiFormatReader();
+  reader.setHints(hints);
+
+  _scanInterval = setInterval(() => {
+    if (!scannerActive || !video || video.readyState < 2) return;
+    const canvas = document.getElementById('scanner-canvas');
+    if (!canvas) return;
+    try {
+      canvas.width  = video.videoWidth  || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const imgData   = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const luminance = new ZXing.RGBLuminanceSource(imgData.data, canvas.width, canvas.height);
+      const bitmap    = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
+      const result    = reader.decode(bitmap);
+
+      if (result) {
+        const code = result.getText();
+        if (scanCooldown || code === lastScannedCode) return;
+        scanCooldown    = true;
+        lastScannedCode = code;
+        setTimeout(() => { scanCooldown = false; lastScannedCode = ''; }, 2500);
+
+        playBeep();
+        if (statusEl) statusEl.textContent = `Buscando: ${code}…`;
+        // Detener el loop (no la cámara completa) para no procesar más frames
+        clearInterval(_scanInterval);
+        _scanInterval = null;
+        // Procesar el código — si no existe abre el modal de alta
+        addProductToCartByBarcode(code).then(() => {
+          // Reiniciar el escaneo después de un breve delay
+          if (scannerActive) {
+            const v = document.getElementById('scanner-video');
+            if (v) {
+              setTimeout(() => {
+                if (scannerActive && !_scanInterval) {
+                  if (statusEl) statusEl.textContent = 'Apuntá el próximo código';
+                  _startZXingScan(v);
+                }
+              }, 1500);
+            }
+          }
+        });
+      }
+    } catch (_) {
+      // NotFoundException es normal cuando no hay código en el frame
+    }
+  }, 250);
+}
+
 async function stopScanner() {
-  if (!scannerActive || !html5QrCode) return;
-  try {
-    await html5QrCode.stop();
-    html5QrCode.clear();
-  } catch (_) {}
-  scannerActive = false;
-  html5QrCode   = null;
+  // Apagar linterna antes de cerrar
+  if (_videoTrack && torchOn) {
+    _videoTrack.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
+  }
+  if (_cameraStream) {
+    _cameraStream.getTracks().forEach(t => t.stop());
+    _cameraStream = null;
+  }
+  if (_scanInterval) {
+    clearInterval(_scanInterval);
+    _scanInterval = null;
+  }
+  scannerActive   = false;
+  _videoTrack     = null;
   currentCamTrack = null;
   torchOn = false;
-  document.getElementById('btnTorch').classList.add('hidden');
-  document.getElementById('btnTorch').classList.remove('flex');
+
+  const torchBtn = document.getElementById('btnTorch');
+  if (torchBtn) {
+    torchBtn.classList.add('hidden');
+    torchBtn.classList.remove('flex');
+  }
   document.getElementById('torchLabel').textContent = 'Linterna';
   document.getElementById('btnStartScan').classList.remove('hidden');
   document.getElementById('btnStopScan').classList.add('hidden');
   document.getElementById('scanStatus').textContent = '';
   document.getElementById('qr-reader').innerHTML = `
-    <div class="text-center text-[#475569] p-8">
-      <svg class="w-20 h-20 mx-auto mb-3 opacity-40 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 9V5a2 2 0 012-2h4M3 15v4a2 2 0 002 2h4m6-18h4a2 2 0 012 2v4m0 6v4a2 2 0 01-2 2h-4M9 9h6v6H9z"/></svg>
+    <div class="text-center text-[#475569] dark:text-gray-400 p-8">
+      <svg class="w-20 h-20 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M3 9V5a2 2 0 012-2h4M3 15v4a2 2 0 002 2h4m6-18h4a2 2 0 012 2v4m0 6v4a2 2 0 01-2 2h-4M9 9h6v6H9z"/>
+      </svg>
       <p class="text-sm">Presioná "Activar Cámara" para escanear</p>
+      <p class="text-xs mt-1 opacity-60">O ingresá el código manualmente abajo</p>
     </div>`;
-}
-
-async function onScanSuccess(code) {
-  if (!code) return;
-  // Evitar disparar múltiples veces el mismo código en rápida sucesión
-  if (scanCooldown || code === lastScannedCode) return;
-  scanCooldown    = true;
-  lastScannedCode = code;
-  setTimeout(() => { scanCooldown = false; lastScannedCode = ''; }, 2500);
-
-  playBeep();
-  document.getElementById('scanStatus').textContent = `Buscando: ${code}…`;
-  await addProductToCartByBarcode(code);
 }
 
 document.getElementById('btnStartScan').addEventListener('click', startScanner);
@@ -334,10 +396,10 @@ document.getElementById('btnStopScan').addEventListener('click', stopScanner);
 
 // Torch (linterna) toggle
 document.getElementById('btnTorch').addEventListener('click', async () => {
-  if (!currentCamTrack) return;
+  if (!_videoTrack) return;
   try {
     torchOn = !torchOn;
-    await currentCamTrack.applyConstraints({ advanced: [{ torch: torchOn }] });
+    await _videoTrack.applyConstraints({ advanced: [{ torch: torchOn }] });
     document.getElementById('torchLabel').textContent = torchOn ? 'Apagar' : 'Linterna';
     document.getElementById('btnTorch').style.color = torchOn ? '#f59e0b' : '';
   } catch(e) {
@@ -407,21 +469,17 @@ async function addProductToCartByBarcode(barcode) {
     const scaleData = decodeScaleBarcode(barcode);
 
     if (scaleData) {
-      // Es un fiambre/producto de balanza
       const docRef  = doc(db, 'productos', scaleData.productCode);
       const docSnap = await getDoc(docRef);
 
       if (!docSnap.exists()) {
-        await stopScanner();
-        document.getElementById('scanStatus').textContent = `⚠️ Fiambre ${scaleData.productCode} no registrado`;
+        stopScanner();
         openScaleAddModal(scaleData);
         return;
       }
 
       const baseProduct = { id: scaleData.productCode, ...docSnap.data() };
       const pricePerKg  = baseProduct.pricePerKg || baseProduct.price || 0;
-
-      // Abrir modal para que el cajero ingrese el peso manualmente
       openScaleWeightModal(baseProduct, pricePerKg, barcode);
       return;
     }
@@ -431,16 +489,16 @@ async function addProductToCartByBarcode(barcode) {
     const docSnap = await getDoc(docRef);
 
     if (!docSnap.exists()) {
-      await stopScanner();
-      document.getElementById('scanStatus').textContent = `⚠️ Código ${barcode} no registrado`;
+      // Código no encontrado → modal de alta rápida
+      stopScanner();
       openQuickAddModal(barcode);
       return;
     }
 
     const product = { id: barcode, ...docSnap.data() };
     addToCart(product);
-    document.getElementById('scanStatus').textContent = `✅ Agregado: ${product.name}`;
-    setTimeout(() => { document.getElementById('scanStatus').textContent = '📡 Listo para escanear'; }, 2000);
+    const statusEl = document.getElementById('scanStatus');
+    if (statusEl) statusEl.textContent = `✅ ${product.name} agregado`;
     refocusBarcode();
   } catch (e) {
     toast('Error al buscar producto', 'error');
@@ -1471,76 +1529,102 @@ async function exportStockToExcel() {
 document.getElementById('btnExportExcel').addEventListener('click', exportStockToExcel);
 
 // ════════════════════════════════════════════════════
-//   STOCK TAB — BARCODE SCANNER
+//   STOCK TAB — BARCODE SCANNER (ZXing)
 // ════════════════════════════════════════════════════
+
+let _stockCameraStream = null;
+let _stockScanInterval = null;
 
 async function startStockScanner() {
   if (stockScannerActive) return;
   const wrap     = document.getElementById('stock-qr-reader-wrap');
   const statusEl = document.getElementById('stockScanStatus');
-  const MAX_TRIES = 3;
 
-  for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
-    try {
-      // Intento 2+ → forzar liberación primero
-      if (attempt > 1) {
-        statusEl.textContent = `🔄 Reintentando (${attempt}/${MAX_TRIES})…`;
-        wrap.classList.remove('hidden');
-        await forceReleaseCamera();
-        await new Promise(r => setTimeout(r, 600 * attempt));
-        if (stockHtml5QrCode) {
-          try { await stockHtml5QrCode.stop(); stockHtml5QrCode.clear(); } catch (_) {}
-          stockHtml5QrCode = null;
-        }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: 'environment' },
+        width:  { ideal: 1920 },
+        height: { ideal: 1080 },
       }
+    });
 
-      stockHtml5QrCode = new Html5Qrcode('stock-qr-reader');
-      const cameras = await Html5Qrcode.getCameras();
-      if (!cameras.length) { toast('No se encontró cámara', 'error'); return; }
+    _stockCameraStream = stream;
+    stockScannerActive = true;
+    wrap.classList.remove('hidden');
 
-      const cam = cameras.find(c => /back|rear|environment/i.test(c.label)) || cameras[cameras.length - 1];
+    document.getElementById('stock-qr-reader').innerHTML = `
+      <div style="position:relative;width:100%;background:#000;border-radius:0.75rem;overflow:hidden;">
+        <video id="stock-scanner-video" autoplay playsinline muted
+          style="width:100%;display:block;max-height:200px;object-fit:cover;"></video>
+        <canvas id="stock-scanner-canvas" style="display:none;"></canvas>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;">
+          <div style="width:72%;height:40%;border:2.5px solid rgba(229,17,17,0.85);border-radius:8px;
+                      box-shadow:0 0 0 9999px rgba(0,0,0,0.35);"></div>
+        </div>
+      </div>`;
 
-      wrap.classList.remove('hidden');
-      await stockHtml5QrCode.start(
-        cam.id,
-        { fps: 10, qrbox: { width: 220, height: 120 }, aspectRatio: 1.5 },
-        (code) => {
-          if (!code) return;
+    const video = document.getElementById('stock-scanner-video');
+    video.srcObject = stream;
+    statusEl.textContent = 'Apuntá al código de barras';
+
+    if (!window.ZXing) {
+      statusEl.textContent = 'Cargando lector…';
+      await loadZXing();
+    }
+
+    const hints   = new Map();
+    const formats = [
+      ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
+      ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
+      ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
+      ZXing.BarcodeFormat.QR_CODE,
+    ];
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    const reader = new ZXing.MultiFormatReader();
+    reader.setHints(hints);
+
+    _stockScanInterval = setInterval(() => {
+      if (!stockScannerActive || !video || video.readyState < 2) return;
+      const canvas = document.getElementById('stock-scanner-canvas');
+      if (!canvas) return;
+      try {
+        canvas.width  = video.videoWidth  || 640;
+        canvas.height = video.videoHeight || 480;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imgData   = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const luminance = new ZXing.RGBLuminanceSource(imgData.data, canvas.width, canvas.height);
+        const bitmap    = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
+        const result    = reader.decode(bitmap);
+        if (result) {
+          const code = result.getText();
+          playBeep();
           document.getElementById('prodBarcode').value = code;
-          statusEl.textContent = `✅ Código: ${code}`;
+          statusEl.textContent = `Código: ${code}`;
           stopStockScanner();
           setTimeout(() => document.getElementById('prodName').focus(), 200);
-        },
-        () => {}
-      );
-      stockScannerActive = true;
-      statusEl.textContent = '📡 Escáner activo — apuntá al código';
-      return; // éxito
+        }
+      } catch (_) {}
+    }, 250);
 
-    } catch (e) {
-      const isNotReadable = e.name === 'NotReadableError' || /not readable|video source/i.test(e.message);
-
-      if (isNotReadable && attempt < MAX_TRIES) {
-        console.warn(`[StockScanner] Intento ${attempt} fallido (NotReadableError). Reintentando...`);
-        continue;
-      }
-
-      wrap.classList.add('hidden');
-      const msg = isNotReadable
-        ? `Cámara en uso por otra app. Cerrá Teams/Zoom y volvé a intentar.`
-        : (e.message || String(e));
-      toast(`Error de cámara: ${msg}`, 'error');
-      return;
-    }
+  } catch (e) {
+    wrap.classList.add('hidden');
+    stockScannerActive = false;
+    toast(`Error de cámara: ${e.message || e}`, 'error');
   }
 }
 
 async function stopStockScanner() {
-  if (!stockScannerActive || !stockHtml5QrCode) return;
-  try {
-    await stockHtml5QrCode.stop();
-    stockHtml5QrCode.clear();
-  } catch (_) {}
+  if (_stockCameraStream) {
+    _stockCameraStream.getTracks().forEach(t => t.stop());
+    _stockCameraStream = null;
+  }
+  if (_stockScanInterval) {
+    clearInterval(_stockScanInterval);
+    _stockScanInterval = null;
+  }
   stockScannerActive = false;
   stockHtml5QrCode   = null;
   document.getElementById('stock-qr-reader-wrap').classList.add('hidden');
